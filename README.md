@@ -24,9 +24,10 @@
 
 | 你的电脑 | 下载这个 |
 |----------|----------|
-| Mac（M1/M2/M3 芯片） | `darwin_arm64` |
+| Mac（M1/M2/M3/M4 芯片） | `darwin_arm64` |
 | Mac（Intel 芯片） | `darwin_amd64` |
-| Linux 服务器 | `linux_amd64` 或 `linux_arm64` |
+| Linux 服务器（x86_64） | `linux_amd64` |
+| Linux 服务器（ARM64） | `linux_arm64` |
 | Windows（64 位） | `windows_amd64`（`.zip` 压缩包） |
 
 **② 解压**
