@@ -208,9 +208,7 @@ func TestAgent_RejectRecordsToolMessage(t *testing.T) {
 
 func TestAgent_IncludesSessionWorkspaceInSystemPrompt(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessions := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessions.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessions.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)

@@ -9,7 +9,7 @@ import (
 	"github.com/databufflabs/databuff-diag/internal/policy"
 )
 
-func TestSessionStore_WorkspaceRootDefaultsToStoreDir(t *testing.T) {
+func TestSessionStore_WorkspaceDirUnderSessionDir(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStoreAt(filepath.Join(dir, "sessions"))
 
@@ -20,24 +20,6 @@ func TestSessionStore_WorkspaceRootDefaultsToStoreDir(t *testing.T) {
 	want := filepath.Join(s.Dir(), created.ID)
 	if got := s.WorkspaceDir(created.ID); got != want {
 		t.Fatalf("WorkspaceDir = %q, want %q", got, want)
-	}
-}
-
-func TestSessionStore_SetWorkspaceRoot(t *testing.T) {
-	dir := t.TempDir()
-	s := NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	s.SetWorkspaceRoot(filepath.Join(dir, "cwd"))
-
-	created, err := s.Create(policy.WriteApproval)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	want := filepath.Join(dir, "cwd", created.ID)
-	if got := s.WorkspaceDir(created.ID); got != want {
-		t.Fatalf("WorkspaceDir = %q, want %q", got, want)
-	}
-	if st, err := os.Stat(want); err != nil || !st.IsDir() {
-		t.Fatalf("workspace dir missing: %v", err)
 	}
 }
 

@@ -30,9 +30,7 @@ func TestWorkspaceHandler_RequiresSessionID(t *testing.T) {
 
 func TestWorkspaceHandler_SessionScopedTree(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -66,9 +64,7 @@ func TestWorkspaceHandler_SessionScopedTree(t *testing.T) {
 
 func TestWorkspaceHandler_FileShellDiagnostics(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -103,9 +99,7 @@ func TestWorkspaceHandler_FileShellDiagnostics(t *testing.T) {
 
 func TestWorkspaceHandler_FileShellPreviewDoesNotExecute(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -143,9 +137,7 @@ func TestWorkspaceHandler_FileShellPreviewDoesNotExecute(t *testing.T) {
 
 func TestWorkspaceHandler_CreateUpdateDeleteFile(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -200,9 +192,7 @@ func TestWorkspaceHandler_CreateUpdateDeleteFile(t *testing.T) {
 
 func TestWorkspaceHandler_UploadFiles(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -260,9 +250,7 @@ func TestWorkspaceHandler_UploadFiles(t *testing.T) {
 
 func TestWorkspaceHandler_LintFile(t *testing.T) {
 	dir := t.TempDir()
-	workspaceRoot := filepath.Join(dir, "workspace")
 	sessionStore := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	sessionStore.SetWorkspaceRoot(workspaceRoot)
 	session, err := sessionStore.Create(policy.WriteApproval)
 	if err != nil {
 		t.Fatalf("Create: %v", err)

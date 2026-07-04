@@ -120,12 +120,12 @@ func TestSessionCleanup_DisabledWhenRetentionZero(t *testing.T) {
 }
 
 func writeSessionFile(s *store.SessionStore, session *store.Session) error {
-	if err := os.MkdirAll(s.Dir(), 0o700); err != nil {
+	if err := os.MkdirAll(s.WorkspaceDir(session.ID), 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.Dir(), session.ID+".json"), data, 0o600)
+	return os.WriteFile(filepath.Join(s.WorkspaceDir(session.ID), store.SessionMetaFilename), data, 0o600)
 }

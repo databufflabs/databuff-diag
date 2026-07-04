@@ -10,6 +10,9 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "databuff-diag",
 	Short: "DataBuff on-site environment diagnostic tool",
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 }
 
 // Execute runs the root command.

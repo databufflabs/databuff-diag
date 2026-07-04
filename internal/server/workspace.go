@@ -132,6 +132,9 @@ func (h *WorkspaceHandler) Tree(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(name, ".") && name != "." {
 			continue
 		}
+		if name == store.SessionMetaFilename {
+			continue
+		}
 		if entry.IsDir() && workspaceSkipDirs[name] {
 			continue
 		}
@@ -627,6 +630,9 @@ func validateWorkspaceFilePath(rel string) error {
 	}
 	base := filepath.Base(clean)
 	if base == "." || base == ".." || base == "" {
+		return errWorkspaceInvalidPath
+	}
+	if base == store.SessionMetaFilename {
 		return errWorkspaceInvalidPath
 	}
 	return nil

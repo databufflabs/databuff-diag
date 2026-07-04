@@ -12,14 +12,14 @@ import (
 
 func writeSessionFile(t *testing.T, s *SessionStore, session *Session) {
 	t.Helper()
-	if err := os.MkdirAll(s.Dir(), 0o700); err != nil {
-		t.Fatalf("mkdir sessions: %v", err)
+	if err := os.MkdirAll(s.sessionDir(session.ID), 0o700); err != nil {
+		t.Fatalf("mkdir session dir: %v", err)
 	}
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if err := os.WriteFile(s.path(session.ID), data, sessionFileMode); err != nil {
+	if err := os.WriteFile(s.metaPath(session.ID), data, sessionFileMode); err != nil {
 		t.Fatalf("write session: %v", err)
 	}
 }
@@ -27,7 +27,6 @@ func writeSessionFile(t *testing.T, s *SessionStore, session *Session) {
 func TestSessionStore_PurgeBefore(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStoreAt(filepath.Join(dir, "sessions"))
-	s.SetWorkspaceRoot(filepath.Join(dir, "workspace"))
 
 	fresh, err := s.Create(policy.WriteApproval)
 	if err != nil {
@@ -46,9 +45,6 @@ func TestSessionStore_PurgeBefore(t *testing.T) {
 		Messages:   []SessionMessage{},
 	}
 	writeSessionFile(t, s, old)
-	if err := os.MkdirAll(s.WorkspaceDir(oldID), 0o700); err != nil {
-		t.Fatalf("mkdir old workspace: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(s.WorkspaceDir(oldID), "gone.txt"), []byte("x"), 0o600); err != nil {
 		t.Fatalf("write old workspace file: %v", err)
 	}

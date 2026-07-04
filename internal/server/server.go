@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/databufflabs/databuff-diag/internal/agent"
@@ -30,11 +29,6 @@ func initStores() (*appStores, error) {
 	if err != nil {
 		return nil, fmt.Errorf("init session store: %w", err)
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("resolve working directory: %w", err)
-	}
-	sessionStore.SetWorkspaceRoot(wd)
 	attachmentStore, err := store.NewAttachmentStore()
 	if err != nil {
 		return nil, fmt.Errorf("init attachment store: %w", err)

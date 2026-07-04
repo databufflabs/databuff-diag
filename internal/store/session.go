@@ -17,6 +17,9 @@ import (
 
 const sessionFileMode = 0o600
 
+// SessionMetaFilename is the metadata file inside each session directory.
+const SessionMetaFilename = "session.json"
+
 // MaxChatMessageRunes is the maximum number of Unicode code points in a user message.
 const MaxChatMessageRunes = 100000
 
@@ -73,11 +76,10 @@ type Session struct {
 	SSHOverrides     map[string]SSHOverride    `json:"ssh_overrides,omitempty"`
 }
 
-// SessionStore persists session JSON under ~/.databuff-diag/sessions/ and
-// per-session workspace folders under the configured workspace root (default: process cwd).
+// SessionStore persists each session under ~/.databuff-diag/sessions/<id>/:
+// session.json holds metadata; other files in the same folder are workspace artifacts.
 type SessionStore struct {
-	dir           string
-	workspaceRoot string
+	dir string
 }
 
 // NewSessionStore resolves the default sessions directory.
@@ -94,36 +96,17 @@ func NewSessionStoreAt(dir string) *SessionStore {
 	return &SessionStore{dir: dir}
 }
 
-// SetWorkspaceRoot sets the parent directory for per-session workspace folders.
-// Defaults to the process working directory when the server starts.
-func (s *SessionStore) SetWorkspaceRoot(root string) {
-	if root == "" {
-		s.workspaceRoot = ""
-		return
-	}
-	s.workspaceRoot = filepath.Clean(root)
-}
-
-// WorkspaceRoot returns the parent directory for session workspace folders.
-func (s *SessionStore) WorkspaceRoot() string {
-	if s.workspaceRoot != "" {
-		return s.workspaceRoot
-	}
-	return s.dir
-}
-
 // Dir returns the sessions directory path.
 func (s *SessionStore) Dir() string {
 	return s.dir
 }
 
-// WorkspaceDir returns the on-disk workspace directory for a session.
-// Each session owns an isolated folder under <workspaceRoot>/<id>/.
+// WorkspaceDir returns the on-disk directory for a session (metadata + workspace files).
 func (s *SessionStore) WorkspaceDir(id string) string {
-	return filepath.Join(s.WorkspaceRoot(), id)
+	return s.sessionDir(id)
 }
 
-// EnsureWorkspaceDir creates the session workspace directory if needed.
+// EnsureWorkspaceDir creates the session directory if needed.
 func (s *SessionStore) EnsureWorkspaceDir(id string) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("session id is required")
@@ -131,9 +114,9 @@ func (s *SessionStore) EnsureWorkspaceDir(id string) (string, error) {
 	if _, err := s.Load(id); err != nil {
 		return "", err
 	}
-	dir := s.WorkspaceDir(id)
+	dir := s.sessionDir(id)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create session workspace: %w", err)
+		return "", fmt.Errorf("create session dir: %w", err)
 	}
 	return dir, nil
 }
@@ -151,8 +134,8 @@ func (s *SessionStore) Create(policyMode policy.Mode) (*Session, error) {
 		PolicyMode: policyMode,
 		Messages:   []SessionMessage{},
 	}
-	if err := os.MkdirAll(s.WorkspaceDir(session.ID), 0o700); err != nil {
-		return nil, fmt.Errorf("create session workspace: %w", err)
+	if err := os.MkdirAll(s.sessionDir(session.ID), 0o700); err != nil {
+		return nil, fmt.Errorf("create session dir: %w", err)
 	}
 	if err := s.Save(session); err != nil {
 		return nil, err
@@ -170,16 +153,26 @@ func (s *SessionStore) List() ([]*Session, error) {
 		return nil, fmt.Errorf("read sessions dir: %w", err)
 	}
 
+	seen := make(map[string]bool)
 	var sessions []*Session
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+		var id string
+		switch {
+		case entry.IsDir():
+			id = entry.Name()
+		case strings.HasSuffix(entry.Name(), ".json"):
+			id = strings.TrimSuffix(entry.Name(), ".json")
+		default:
 			continue
 		}
-		id := strings.TrimSuffix(entry.Name(), ".json")
+		if id == "" || seen[id] {
+			continue
+		}
 		session, err := s.Load(id)
 		if err != nil {
 			continue
 		}
+		seen[id] = true
 		sessions = append(sessions, session)
 	}
 
@@ -225,13 +218,17 @@ func (s *SessionStore) Load(id string) (*Session, error) {
 	if id == "" {
 		return nil, fmt.Errorf("session id is required")
 	}
-	path := s.path(id)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(s.metaPath(id))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("session %q not found", id)
+			data, err = os.ReadFile(s.legacyMetaPath(id))
 		}
-		return nil, fmt.Errorf("read session: %w", err)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, fmt.Errorf("session %q not found", id)
+			}
+			return nil, fmt.Errorf("read session: %w", err)
+		}
 	}
 	var session Session
 	if err := json.Unmarshal(data, &session); err != nil {
@@ -246,8 +243,9 @@ func (s *SessionStore) Save(session *Session) error {
 		return fmt.Errorf("session id is required")
 	}
 	session.UpdatedAt = time.Now().UTC()
-	if err := os.MkdirAll(s.dir, 0o700); err != nil {
-		return fmt.Errorf("create sessions dir: %w", err)
+	dir := s.sessionDir(session.ID)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create session dir: %w", err)
 	}
 
 	data, err := json.MarshalIndent(session, "", "  ")
@@ -255,17 +253,26 @@ func (s *SessionStore) Save(session *Session) error {
 		return fmt.Errorf("marshal session: %w", err)
 	}
 
-	tmp := s.path(session.ID) + ".tmp"
+	tmp := filepath.Join(dir, SessionMetaFilename+".tmp")
 	if err := os.WriteFile(tmp, data, sessionFileMode); err != nil {
 		return fmt.Errorf("write session: %w", err)
 	}
-	if err := os.Rename(tmp, s.path(session.ID)); err != nil {
+	if err := os.Rename(tmp, s.metaPath(session.ID)); err != nil {
 		return fmt.Errorf("rename session: %w", err)
 	}
+	_ = os.Remove(s.legacyMetaPath(session.ID))
 	return nil
 }
 
-func (s *SessionStore) path(id string) string {
+func (s *SessionStore) sessionDir(id string) string {
+	return filepath.Join(s.dir, id)
+}
+
+func (s *SessionStore) metaPath(id string) string {
+	return filepath.Join(s.sessionDir(id), SessionMetaFilename)
+}
+
+func (s *SessionStore) legacyMetaPath(id string) string {
 	return filepath.Join(s.dir, id+".json")
 }
 
@@ -306,7 +313,6 @@ func (s *SessionStore) AppendMessage(session *Session, msg SessionMessage) error
 }
 
 // PurgeBefore removes sessions whose UpdatedAt is strictly before cutoff.
-// Each removed session deletes its JSON file and workspace directory.
 func (s *SessionStore) PurgeBefore(cutoff time.Time) ([]string, error) {
 	sessions, err := s.List()
 	if err != nil {
@@ -326,17 +332,16 @@ func (s *SessionStore) PurgeBefore(cutoff time.Time) ([]string, error) {
 	return purged, nil
 }
 
-// Delete removes a session JSON file and its workspace directory.
+// Delete removes a session directory and any legacy flat metadata file.
 func (s *SessionStore) Delete(id string) error {
 	if id == "" {
 		return fmt.Errorf("session id is required")
 	}
-	if err := os.Remove(s.path(id)); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(s.sessionDir(id)); err != nil {
 		return fmt.Errorf("remove session %q: %w", id, err)
 	}
-	workspace := s.WorkspaceDir(id)
-	if err := os.RemoveAll(workspace); err != nil {
-		return fmt.Errorf("remove workspace %q: %w", id, err)
+	if err := os.Remove(s.legacyMetaPath(id)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove legacy session %q: %w", id, err)
 	}
 	return nil
 }
