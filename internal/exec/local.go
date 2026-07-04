@@ -53,7 +53,7 @@ type Result struct {
 	TimedOut        bool
 }
 
-// Run executes command via sh -c with timeout and output truncation.
+// Run executes command via the platform shell with timeout and output truncation.
 func (l *Local) Run(ctx context.Context, command string) (*Result, error) {
 	if command == "" {
 		return nil, fmt.Errorf("command is required")
@@ -72,7 +72,7 @@ func (l *Local) Run(ctx context.Context, command string) (*Result, error) {
 	defer cancel()
 
 	start := time.Now()
-	cmd := exec.CommandContext(runCtx, "sh", "-c", command)
+	cmd := shellCommand(runCtx, command)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf

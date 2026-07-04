@@ -10,7 +10,7 @@
 
 | 需要 | 说明 |
 |------|------|
-| Mac 或 Linux 电脑 | 暂不支持 Windows |
+| Mac、Linux 或 Windows 电脑 | Windows 10/11 均可 |
 | 能上网 | 下载程序 + 调用大模型 |
 | 大模型 API Key | 推荐 [DeepSeek](https://platform.deepseek.com) 注册后创建，免费额度够用 |
 
@@ -27,20 +27,31 @@
 | Mac（M1/M2/M3 芯片） | `darwin_arm64` |
 | Mac（Intel 芯片） | `darwin_amd64` |
 | Linux 服务器 | `linux_amd64` 或 `linux_arm64` |
+| Windows（64 位） | `windows_amd64`（`.zip` 压缩包） |
 
 **② 解压**
 
-下载得到一个 `.tar.gz` 文件。打开「终端」（Mac 在「启动台 → 其他 → 终端」），执行：
+**Mac / Linux：** 下载得到 `.tar.gz` 文件。打开「终端」（Mac 在「启动台 → 其他 → 终端」），执行：
 
 ```bash
 cd ~/Downloads
 tar -xzf databuff-diag_*.tar.gz
 ```
 
+**Windows：** 下载得到 `.zip` 文件，右键「全部解压缩」到任意文件夹（例如 `C:\databuff-diag`）。
+
 **③ 启动**
+
+**Mac / Linux：**
 
 ```bash
 ./databuff-diag serve
+```
+
+**Windows：** 打开「命令提示符」或 PowerShell，进入解压目录后执行：
+
+```powershell
+.\databuff-diag.exe serve
 ```
 
 看到 `databuff-diag listening on :8787` 表示启动成功。**不要关闭这个终端窗口**，关了程序就停了。
@@ -84,6 +95,8 @@ tar -xzf databuff-diag_*.tar.gz
 2. 填写服务器 IP、用户名、密码
 3. 保存
 
+远程机器只需正常开启 SSH 服务，无需安装 sshpass。
+
 ![添加远程主机](docs/images/settings-ssh.png)
 
 ---
@@ -113,7 +126,7 @@ AI 会自动执行命令并把结果告诉你。如果弹出「待批准」提�
 | 网页打不开 | 确认终端里 `databuff-diag serve` 还在运行 |
 | 登录不了 | 检查用户名 `Admin`、密码 `Databuff@123` |
 | 对话没反应 | 回到 **设置 → 大模型**，确认已「保存并启用」且测试连接成功 |
-| 连不上远程机器 | 检查 IP、用户名、密码是否正确；密码登录需先执行 `brew install sshpass`（Mac） |
+| 连不上远程机器 | 检查 IP、用户名、密码是否正确；确认远程已开启 SSH。密码登录**不需要**在远程安装 sshpass；本机未装 sshpass 时会自动使用内置方式，也可选安装（Mac：`brew install sshpass`）或改用 SSH 密钥登录 |
 
 ---
 

@@ -21,7 +21,7 @@ type SSHConfig struct {
 	ExtraArgs      []string
 }
 
-// SSH runs shell commands on a remote host using `ssh` (and `sshpass` when a password is set).
+// SSH runs shell commands on a remote host using `ssh` (sshpass when available, or built-in password auth).
 type SSH struct {
 	Host           string
 	User           string
@@ -103,18 +103,22 @@ func (s *SSH) Run(ctx context.Context, command string) (*Result, error) {
 	args := s.sshArgs(command)
 	start := time.Now()
 
-	var cmd *exec.Cmd
 	if s.Password != "" {
 		if _, err := exec.LookPath("sshpass"); err != nil {
-			return nil, fmt.Errorf("sshpass is required for password authentication: %w", err)
+			return s.runNativePassword(runCtx, command)
 		}
 		sshArgs := append([]string{"-e", "ssh"}, args...)
-		cmd = exec.CommandContext(runCtx, "sshpass", sshArgs...)
+		cmd := exec.CommandContext(runCtx, "sshpass", sshArgs...)
 		cmd.Env = append(os.Environ(), "SSHPASS="+s.Password)
-	} else {
-		cmd = exec.CommandContext(runCtx, "ssh", args...)
+		return s.runSSHCmd(runCtx, cmd, start, s.MaxOutputBytes)
 	}
 
+	cmd := exec.CommandContext(runCtx, "ssh", args...)
+
+	return s.runSSHCmd(runCtx, cmd, start, s.MaxOutputBytes)
+}
+
+func (s *SSH) runSSHCmd(runCtx context.Context, cmd *exec.Cmd, start time.Time, maxOutputBytes int) (*Result, error) {
 	var stdoutBuf, stderrBuf strings.Builder
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
@@ -127,7 +131,7 @@ func (s *SSH) Run(ctx context.Context, command string) (*Result, error) {
 		TimedOut:   runCtx.Err() == context.DeadlineExceeded,
 	}
 
-	maxBytes := s.MaxOutputBytes
+	maxBytes := maxOutputBytes
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxOutputBytes
 	}

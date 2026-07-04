@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build windows
 
 package exec
 
@@ -37,7 +37,7 @@ func TestLocal_Echo(t *testing.T) {
 
 func TestLocal_False(t *testing.T) {
 	l := NewLocal(LocalConfig{})
-	result, err := l.Run(context.Background(), "false")
+	result, err := l.Run(context.Background(), "exit 1")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestLocal_False(t *testing.T) {
 func TestLocal_LongOutputTruncated(t *testing.T) {
 	const maxBytes = 1024
 	l := NewLocal(LocalConfig{MaxOutputBytes: maxBytes})
-	result, err := l.Run(context.Background(), "python3 -c \"print('x' * 5000)\"")
+	result, err := l.Run(context.Background(), "powershell -NoProfile -Command \"'x' * 5000\"")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestLocal_LongOutputTruncated(t *testing.T) {
 
 func TestLocal_Timeout(t *testing.T) {
 	l := NewLocal(LocalConfig{Timeout: 100 * time.Millisecond})
-	result, err := l.Run(context.Background(), "sleep 5")
+	result, err := l.Run(context.Background(), "powershell -NoProfile -Command \"Start-Sleep -Seconds 5\"")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
