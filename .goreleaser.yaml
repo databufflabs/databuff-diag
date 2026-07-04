@@ -1,0 +1,46 @@
+version: 2
+
+project_name: databuff-diag
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: databuff-diag
+    main: ./cmd/databuff-diag
+    binary: databuff-diag
+    ldflags:
+      - -s -w
+      - -X github.com/databufflabs/databuff-diag/internal/version.Version={{.Version}}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: databufflabs
+    name: databuff-diag
+
+snapshot:
+  name_template: "{{ .Tag }}-snapshot"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"

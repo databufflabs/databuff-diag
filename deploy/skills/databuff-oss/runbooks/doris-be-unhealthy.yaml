@@ -1,0 +1,31 @@
+id: doris-be-unhealthy
+skill: databuff-oss
+symptoms:
+  - Doris BE unhealthy or restarting
+  - ingest/web stuck waiting for doris-be
+  - port 8040 health check failed
+  - BE OOMKilled or exit 137
+checks:
+  - id: compose_ps_be
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml ps ai-apm-doris-be ai-apm-doris-fe 2>&1"
+    risk: readonly
+  - id: be_health
+    cmd: "curl -sf http://127.0.0.1:8040/api/health 2>&1 || echo 'BE health HTTP failed'"
+    risk: readonly
+  - id: be_logs
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs ai-apm-doris-be --tail 80 2>&1"
+    risk: readonly
+  - id: be_inspect
+    cmd: "docker inspect ai-apm-doris-be --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' 2>&1"
+    risk: readonly
+  - id: vm_max_map_count
+    cmd: "sysctl vm.max_map_count 2>/dev/null || cat /proc/sys/vm/max_map_count 2>/dev/null || echo 'vm.max_map_count unknown'"
+    risk: readonly
+  - id: host_memory
+    cmd: "free -m"
+    risk: readonly
+hints:
+  - BE depends on healthy FE; fix FE first if FE is not healthy.
+  - BE mem_limit is 6g by default; host should have headroom beyond container limits.
+  - Low vm.max_map_count (< 2000000) causes Doris BE startup failures; start.sh tries to raise it on Linux.
+  - OOMKilled BE often needs more host RAM or fewer competing workloads — cite inspect output before recommending changes.

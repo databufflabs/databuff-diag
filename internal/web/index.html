@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataBuff Diag</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="view-login" class="login-screen" hidden>
+    <div class="login-bg" aria-hidden="true">
+      <div class="login-bg-orb login-bg-orb-1"></div>
+      <div class="login-bg-orb login-bg-orb-2"></div>
+      <div class="login-bg-orb login-bg-orb-3"></div>
+      <div class="login-bg-grid"></div>
+    </div>
+    <div class="login-card">
+      <div class="login-brand">
+        <span class="brand-mark login-logo" aria-hidden="true">
+          <img src="/favicon.svg" alt="" width="36" height="36">
+        </span>
+        <div class="login-brand-text">
+          <h1 class="login-title">DataBuff Diag</h1>
+          <p class="login-subtitle">Databuff 诊断助手</p>
+        </div>
+      </div>
+      <form id="login-form" class="login-form" autocomplete="on">
+        <div class="form-row">
+          <label class="form-label" for="login-username">用户名</label>
+          <input class="form-input login-input" type="text" id="login-username" name="username" autocomplete="username" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="login-password">密码</label>
+          <div class="password-field">
+            <input class="form-input login-input" type="password" id="login-password" name="password" autocomplete="current-password" required>
+            <button type="button" class="password-toggle" id="login-password-toggle" aria-label="显示密码" title="显示密码" aria-pressed="false">
+              <svg class="password-toggle-icon password-toggle-show" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M1.5 8s2.2-4 6.5-4 6.5 4 6.5 4-2.2 4-6.5 4-6.5-4-6.5-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+              <svg class="password-toggle-icon password-toggle-hide" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M2.2 2.2l11.6 11.6M6.4 6.7A2.5 2.5 0 008 10.5a2.5 2.5 0 002.1-1.1M3.7 4.4A7.2 7.2 0 001.5 8s2.2 4 6.5 4c1.2 0 2.3-.3 3.2-.8M8 4c4.3 0 6.5 4 6.5 4a11.4 11.4 0 01-1.6 2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="login-error" class="login-error" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary login-submit" id="login-submit">
+          <span class="btn-label">登录</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="ide" id="app-root" hidden>
+    <!-- 左侧：历史对话 -->
+    <aside class="sidebar sidebar-left" aria-label="历史对话">
+      <div class="sidebar-top">
+        <div class="brand">
+          <span class="brand-mark sidebar-logo" aria-hidden="true">
+            <img src="/favicon.svg" alt="" width="22" height="22">
+          </span>
+          <div class="brand-text">
+            <span class="brand-name">
+              <span class="brand-name-primary">DataBuff</span>
+              <span class="brand-name-accent">Diag</span>
+            </span>
+            <span class="brand-tagline">
+              <span class="brand-status-dot" aria-hidden="true"></span>
+              现场诊断助手
+            </span>
+          </div>
+        </div>
+        <button type="button" class="icon-btn icon-btn-accent brand-action" id="btn-new-chat" title="新对话" aria-label="新对话">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="session-list-header">历史对话</div>
+      <div id="session-list" class="session-list" role="listbox" aria-label="会话列表"></div>
+
+      <div class="sidebar-bottom">
+        <button type="button" class="sidebar-nav-btn" data-view="settings">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 10a2 2 0 100-4 2 2 0 000 4z"/><path d="M13.7 8.9l-.9-.5a.5.5 0 01-.2-.6l.4-.9a1 1 0 00-.2-1.1l-.7-.7a1 1 0 00-1.1-.2l-.9.4a.5.5 0 01-.6-.2l-.5-.9a1 1 0 00-1-.6h-1a1 1 0 00-1 .6l-.5.9a.5.5 0 01-.6.2l-.9-.4a1 1 0 00-1.1.2l-.7.7a1 1 0 00-.2 1.1l.4.9a.5.5 0 01-.2.6l-.9.5a1 1 0 00-.6 1v1a1 1 0 00.6 1l.9.5a.5.5 0 01.2.6l-.4.9a1 1 0 00.2 1.1l.7.7a1 1 0 001.1.2l.9-.4a.5.5 0 01.6.2l.5.9a1 1 0 001 .6h1a1 1 0 001-.6l.5-.9a.5.5 0 01.6-.2l.9.4a1 1 0 001.1-.2l.7-.7a1 1 0 00.2-1.1l-.4-.9a.5.5 0 01.2-.6l.9-.5a1 1 0 00.6-1v-1a1 1 0 00-.6-1z" fill-rule="evenodd"/></svg>
+          设置
+        </button>
+      </div>
+    </aside>
+
+    <!-- 中间：对话区域 -->
+    <main class="main">
+      <div id="view-chat" class="view view-chat active">
+        <header class="chat-header">
+          <div class="chat-header-main">
+            <span class="chat-title" id="chat-title">新对话</span>
+            <button type="button" class="btn-copy-link" id="btn-copy-session-link" title="复制会话链接" aria-label="复制会话链接" hidden>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 5.5V4a1.5 1.5 0 00-1.5-1.5H4A1.5 1.5 0 002.5 4v5A1.5 1.5 0 004 10.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+            <span class="chat-status-dot" id="chat-status-dot" title="就绪" aria-hidden="true"></span>
+          </div>
+          <div class="chat-header-actions">
+            <label class="chat-policy-label" for="field-policy-mode">安全策略</label>
+            <select class="chat-policy-select" id="field-policy-mode" aria-label="命令安全策略">
+              <option value="all_approval">全部审批</option>
+              <option value="write_approval">写入审批</option>
+              <option value="open">全部开放</option>
+            </select>
+          </div>
+        </header>
+
+        <div id="chat-error" class="chat-error" role="alert" hidden></div>
+
+        <div class="chat-body">
+          <div class="chat-messages-wrap">
+            <div id="chat-messages" class="chat-messages" aria-live="polite" aria-label="对话消息"></div>
+            <div id="chat-approvals" class="chat-approvals" aria-label="待审批命令"></div>
+          </div>
+        </div>
+
+        <form id="chat-form" class="chat-composer" novalidate>
+          <div class="chat-composer-box">
+            <div id="chat-attachments" class="chat-attachments" hidden></div>
+            <div class="chat-composer-inner">
+              <input
+                type="file"
+                id="chat-file-input"
+                class="chat-file-input"
+                multiple
+                accept="image/*,.txt,.log,.json,.yaml,.yml,.xml,.md,.csv,.conf,.cfg,.sh,.env"
+                hidden
+              />
+              <button type="button" class="btn-attach" id="chat-attach-btn" title="上传文件或图片" aria-label="上传文件或图片">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.75 1.5a3.25 3.25 0 00-3.25 3.25v6.5a2.25 2.25 0 104.5 0V4.25a1.25 1.25 0 10-2.5 0v7a3.75 3.75 0 107.5 0V4.25a5.75 5.75 0 10-11.5 0v7a5 5 0 1010 0V4.25a1.25 1.25 0 10-2.5 0v7a2.5 2.5 0 11-5 0V4.25a3.25 3.25 0 116.5 0v6.5a4.5 4.5 0 11-9 0V4.25a3.25 3.25 0 116.5 0z" stroke="currentColor" stroke-width="1.2"/></svg>
+              </button>
+              <textarea
+                class="chat-input"
+                id="chat-input"
+                name="message"
+                rows="1"
+                maxlength="100000"
+                placeholder="描述环境问题或排查需求…"
+                aria-label="消息输入"
+              ></textarea>
+              <button type="submit" class="btn btn-send" id="chat-send" aria-label="发送">
+                <svg class="btn-send-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.5 2.5l11 5.5-11 5.5V9l6-1.5-6-1.5V2.5z"/></svg>
+                <svg class="btn-stop-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div id="view-settings" class="view view-settings" hidden>
+        <header class="settings-toolbar">
+          <nav class="settings-tabs" role="tablist" aria-label="设置分类">
+            <button type="button" class="settings-tab active" role="tab" id="settings-tab-btn-llm" data-settings-tab="llm" aria-selected="true" aria-controls="settings-tab-llm">大模型</button>
+            <button type="button" class="settings-tab" role="tab" id="settings-tab-btn-hosts" data-settings-tab="hosts" aria-selected="false" aria-controls="settings-tab-hosts">远程主机</button>
+          </nav>
+          <button type="button" class="btn-back settings-toolbar-back" id="btn-back-from-settings">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            返回对话
+          </button>
+        </header>
+
+        <div id="settings-loading" class="settings-loading" hidden>
+          <div class="settings-loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span>正在加载配置…</span>
+        </div>
+        <div id="settings-error" class="settings-error" role="alert" hidden></div>
+
+        <div id="settings-tab-llm" class="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-btn-llm">
+          <div class="settings-subtoolbar">
+            <p class="settings-desc">点击提供商卡片，在弹窗中填写参数并保存</p>
+            <div class="provider-search-wrap">
+              <svg class="provider-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <input type="search" class="provider-search" id="provider-search" placeholder="搜索提供商…" autocomplete="off" aria-label="搜索提供商">
+            </div>
+          </div>
+          <div class="settings-body" id="settings-body-llm">
+            <div id="provider-cards" class="provider-cards" aria-label="LLM 提供商"></div>
+            <p id="provider-empty" class="provider-empty" hidden>没有匹配的提供商</p>
+          </div>
+        </div>
+
+        <div id="settings-tab-hosts" class="settings-tab-panel" role="tabpanel" aria-labelledby="settings-tab-btn-hosts" hidden>
+          <div class="settings-subtoolbar">
+            <p class="settings-desc">管理远程主机的 SSH 登录信息，供诊断时连接使用</p>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-add-host">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <span class="btn-label">添加主机</span>
+            </button>
+          </div>
+          <div class="settings-body" id="settings-body-hosts">
+            <div id="host-cards" class="host-cards" aria-label="远程主机列表"></div>
+            <p id="host-empty" class="host-empty" hidden>暂无远程主机，点击「添加主机」开始配置</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 右侧：文件区域 -->
+    <aside class="sidebar sidebar-right" aria-label="工作区文件">
+      <div class="files-header">
+        <div class="files-header-top">
+          <span class="files-title">工作区</span>
+          <div class="files-actions">
+            <button type="button" class="icon-btn files-action-btn" id="workspace-upload-file" title="上传文件" aria-label="上传文件">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.5v7M5.5 7L8 4.5 10.5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="icon-btn files-action-btn" id="workspace-new-file" title="新建文件" aria-label="新建文件">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="files-root-row">
+          <span id="workspace-root" class="files-root" title="工作区根目录"></span>
+          <button type="button" class="btn-copy-link" id="workspace-copy-path" title="复制路径" aria-label="复制路径" hidden>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 5.5V4a1.5 1.5 0 00-1.5-1.5H4A1.5 1.5 0 002.5 4v5A1.5 1.5 0 004 10.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+      </div>
+      <input
+        type="file"
+        id="workspace-file-input"
+        class="workspace-file-input"
+        multiple
+        hidden
+      />
+      <div id="file-tree" class="file-tree" role="tree" aria-label="文件树"></div>
+    </aside>
+  </div>
+
+  <div id="provider-modal" class="provider-modal" hidden role="dialog" aria-modal="true" aria-labelledby="provider-modal-title">
+    <div class="provider-modal-backdrop" id="provider-modal-backdrop"></div>
+    <div class="provider-modal-panel">
+      <header class="provider-modal-header">
+        <div class="provider-modal-header-main">
+          <span id="provider-modal-avatar" class="provider-card-avatar" aria-hidden="true"></span>
+          <div class="provider-modal-header-text">
+            <h3 id="provider-modal-title" class="provider-modal-title">—</h3>
+            <p id="provider-modal-sub" class="provider-modal-sub">—</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn provider-modal-close" id="provider-modal-close" aria-label="关闭">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="provider-modal-body">
+        <form id="settings-form" class="settings-form" novalidate>
+          <div class="form-row">
+            <label class="form-label" for="field-api-key">API Key</label>
+            <input class="form-input" type="text" id="field-api-key" name="api_key" autocomplete="off" placeholder="输入 API Key">
+            <p class="form-hint" id="field-api-key-hint">密钥仅保存在本地</p>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="field-base-url">Base URL</label>
+            <input class="form-input" type="url" id="field-base-url" name="base_url" autocomplete="off" placeholder="https://api.example.com/v1" required>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="field-model">模型</label>
+            <input class="form-input" type="text" id="field-model" name="model" required placeholder="例如 gpt-4o">
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="field-response-processor">响应解析器</label>
+            <select class="form-select" id="field-response-processor" name="response_processor">
+              <option value="openai_compat">openai_compat — OpenAI 兼容</option>
+              <option value="anthropic_messages">anthropic_messages — Anthropic</option>
+              <option value="databuff_ultra_result">databuff_ultra_result — DataBuff Ultra</option>
+            </select>
+          </div>
+          <div id="test-result" class="test-result" role="status" hidden></div>
+          <div id="save-status" class="save-status" role="status" hidden></div>
+        </form>
+      </div>
+      <footer class="provider-modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-test">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="btn-label">测试连接</span>
+        </button>
+        <button type="submit" class="btn btn-primary" id="btn-save" form="settings-form">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 2.5h7l3 3V13a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2.5V6h5V2.5M5.5 13.5a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" stroke-width="1.3"/></svg>
+          <span class="btn-label">保存并启用</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="host-modal" class="provider-modal" hidden role="dialog" aria-modal="true" aria-labelledby="host-modal-title">
+    <div class="provider-modal-backdrop" id="host-modal-backdrop"></div>
+    <div class="provider-modal-panel">
+      <header class="provider-modal-header">
+        <div class="provider-modal-header-main">
+          <span class="host-modal-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 13v1.5M11 13v1.5M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </span>
+          <div class="provider-modal-header-text">
+            <h3 id="host-modal-title" class="provider-modal-title">添加主机</h3>
+            <p id="host-modal-sub" class="provider-modal-sub">配置 SSH 登录信息</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn provider-modal-close" id="host-modal-close" aria-label="关闭">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="provider-modal-body">
+        <form id="host-form" class="settings-form" novalidate>
+          <div class="form-row">
+            <label class="form-label" for="field-host-name">显示名称</label>
+            <input class="form-input" type="text" id="field-host-name" name="name" autocomplete="off" placeholder="例如 生产数据库">
+            <p class="form-hint">可选，便于识别</p>
+          </div>
+          <div class="form-row form-row-inline">
+            <div class="form-row-col">
+              <label class="form-label" for="field-host-addr">主机地址</label>
+              <input class="form-input" type="text" id="field-host-addr" name="host" autocomplete="off" placeholder="192.168.1.100" required>
+            </div>
+            <div class="form-row-col form-row-col-narrow">
+              <label class="form-label" for="field-host-port">端口</label>
+              <input class="form-input" type="number" id="field-host-port" name="port" autocomplete="off" placeholder="22" min="1" max="65535">
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="field-host-user">登录用户名</label>
+            <input class="form-input" type="text" id="field-host-user" name="user" autocomplete="off" placeholder="root" required>
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="field-host-password">登录密码</label>
+            <input class="form-input" type="password" id="field-host-password" name="password" autocomplete="new-password" placeholder="输入 SSH 密码">
+            <p class="form-hint" id="field-host-password-hint">密码仅保存在本地</p>
+          </div>
+          <div id="host-save-status" class="save-status" role="status" hidden></div>
+        </form>
+      </div>
+      <footer class="provider-modal-footer">
+        <button type="button" class="btn btn-danger btn-ghost" id="btn-host-delete" hidden>
+          <span class="btn-label">删除</span>
+        </button>
+        <span class="provider-modal-footer-spacer"></span>
+        <button type="button" class="btn btn-secondary" id="btn-host-cancel">
+          <span class="btn-label">取消</span>
+        </button>
+        <button type="submit" class="btn btn-primary" id="btn-host-save" form="host-form">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 2.5h7l3 3V13a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2.5V6h5V2.5M5.5 13.5a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" stroke-width="1.3"/></svg>
+          <span class="btn-label">保存</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="workspace-new-file-modal" class="provider-modal" hidden role="dialog" aria-modal="true" aria-labelledby="workspace-new-file-title">
+    <div class="provider-modal-backdrop" id="workspace-new-file-backdrop"></div>
+    <div class="provider-modal-panel workspace-new-file-panel">
+      <header class="provider-modal-header">
+        <div class="provider-modal-header-main">
+          <span class="workspace-new-file-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h6.5L13 6v6.5a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 2.5V6H13" stroke="currentColor" stroke-width="1.3"/></svg>
+          </span>
+          <div class="provider-modal-header-text">
+            <h3 id="workspace-new-file-title" class="provider-modal-title">新建文件</h3>
+            <p id="workspace-new-file-sub" class="provider-modal-sub">当前目录：根目录</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn provider-modal-close" id="workspace-new-file-close" aria-label="关闭">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="provider-modal-body">
+        <form id="workspace-new-file-form" class="settings-form" novalidate>
+          <div class="form-row">
+            <label class="form-label" for="workspace-new-file-input">文件名</label>
+            <input class="form-input" type="text" id="workspace-new-file-input" autocomplete="off" placeholder="例如 report.md" required>
+            <p id="workspace-new-file-error" class="workspace-new-file-error" role="alert" hidden></p>
+          </div>
+        </form>
+      </div>
+      <footer class="provider-modal-footer">
+        <button type="button" class="btn btn-secondary" id="workspace-new-file-cancel">取消</button>
+        <button type="submit" class="btn btn-primary" id="workspace-new-file-submit" form="workspace-new-file-form">创建</button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="confirm-dialog" class="provider-modal confirm-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+    <div class="provider-modal-backdrop" id="confirm-dialog-backdrop"></div>
+    <div class="provider-modal-panel confirm-dialog-panel">
+      <div class="confirm-dialog-content">
+        <div class="confirm-dialog-icon" id="confirm-dialog-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M9 3h6l1 2h4a1 1 0 110 2H4a1 1 0 110-2h4l1-2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M6 7h12l-1 14H7L6 7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3 id="confirm-dialog-title" class="confirm-dialog-title">确认操作</h3>
+        <p id="confirm-dialog-message" class="confirm-dialog-message"></p>
+        <p id="confirm-dialog-detail" class="confirm-dialog-detail" hidden></p>
+      </div>
+      <footer class="provider-modal-footer confirm-dialog-footer">
+        <button type="button" class="btn btn-secondary" id="confirm-dialog-cancel">取消</button>
+        <button type="button" class="btn btn-danger-solid" id="confirm-dialog-confirm">确认</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+id: docker-health
+skill: generic-infra
+symptoms:
+  - container unhealthy or restarting
+  - docker compose service down
+  - cannot reach application behind container
+checks:
+  - id: docker_ps
+    cmd: "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+    risk: readonly
+  - id: docker_ps_all
+    cmd: "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.State}}'"
+    risk: readonly
+  - id: docker_inspect_health
+    cmd: "docker inspect --format '{{.Name}} health={{.State.Health.Status}} exit={{.State.ExitCode}} restarting={{.State.Restarting}}' $(docker ps -q) 2>/dev/null || true"
+    risk: readonly
+  - id: docker_logs_tail
+    cmd: "docker logs --tail 80 $(docker ps -q | head -1) 2>&1 || echo 'no running container for logs'"
+    risk: readonly
+hints:
+  - Compare restart count and exit code across `docker ps -a` and inspect output.
+  - If health check fails, read the last 80 log lines before suggesting image or config changes.
+  - For compose stacks, also check whether the expected service name appears in `docker ps`.

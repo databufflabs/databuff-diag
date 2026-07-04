@@ -1,0 +1,23 @@
+id: k8s-pod-crash
+skill: generic-infra
+symptoms:
+  - pod CrashLoopBackOff
+  - pod OOMKilled or Error phase
+  - deployment replicas not ready
+checks:
+  - id: kubectl_get_pods
+    cmd: "kubectl get pods -A -o wide"
+    risk: readonly
+  - id: kubectl_get_events
+    cmd: "kubectl get events -A --sort-by='.lastTimestamp' | tail -30"
+    risk: readonly
+  - id: kubectl_describe_failing
+    cmd: "kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded -o name | head -1 | xargs -r kubectl describe"
+    risk: readonly
+  - id: kubectl_logs_previous
+    cmd: "POD=$(kubectl get pods -A --field-selector=status.phase!=Running -o jsonpath='{.items[0].metadata.namespace}/{.items[0].metadata.name}' 2>/dev/null); NS=${POD%%/*}; NAME=${POD##*/}; [ -n \"$NAME\" ] && kubectl logs -n \"$NS\" \"$NAME\" --previous --tail=80 2>&1 || echo 'no failing pod for previous logs'"
+    risk: readonly
+hints:
+  - Look at `Last State` termination reason and exit code in describe output.
+  - OOMKilled often needs memory limit review; ImagePullBackOff needs registry/tag checks.
+  - Use `--previous` logs when the current container restarted and logs are empty.

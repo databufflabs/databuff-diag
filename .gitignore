@@ -1,0 +1,46 @@
+# Binaries (repo root only — do not match cmd/databuff-diag/)
+/databuff-diag
+/databuff-diag-*
+/bin/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Goreleaser
+dist/
+
+# Deploy build outputs
+deploy/dist/
+
+# Internal dev artifacts (task evidence, quality gates)
+.dev/
+
+# Local deploy runtime
+deploy/local/run/*
+!deploy/local/run/.gitkeep
+.databuff-diag.pid
+.databuff-diag.log
+
+# Session workspaces created at runtime (cwd = deploy/local/)
+deploy/local/*/
+!deploy/local/scripts/
+!deploy/local/run/

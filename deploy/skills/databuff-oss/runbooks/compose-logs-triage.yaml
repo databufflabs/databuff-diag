@@ -1,0 +1,31 @@
+id: compose-logs-triage
+skill: databuff-oss
+symptoms:
+  - docker compose stack partially up
+  - start.sh timed out waiting for services
+  - need correlated logs across DataBuff containers
+  - multiple services restarting after install
+checks:
+  - id: compose_ps_all
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml ps -a 2>&1"
+    risk: readonly
+  - id: compose_config_services
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml config --services 2>&1"
+    risk: readonly
+  - id: logs_doris
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs ai-apm-doris-fe ai-apm-doris-be --tail 50 2>&1"
+    risk: readonly
+  - id: logs_app
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs ai-apm-ingest ai-apm-web --tail 50 2>&1"
+    risk: readonly
+  - id: recent_events
+    cmd: "docker events --since 10m --until 0s --filter container=ai-apm-doris-fe --filter container=ai-apm-doris-be --filter container=ai-apm-ingest --filter container=ai-apm-web 2>&1 | tail -30 || echo 'docker events unavailable or no recent events'"
+    risk: readonly
+  - id: start_script_hint
+    cmd: "test -x /opt/databuff-ai-apm/start.sh && head -30 /opt/databuff-ai-apm/start.sh || echo 'start.sh not found'"
+    risk: readonly
+hints:
+  - Read `compose ps` first — note Health column and dependency order (FE → BE → ingest/web).
+  - start.sh waits for Doris then probes ingest/web health; timeout messages point to the failing layer.
+  - Correlate timestamps across FE/BE logs before ingest/web logs to find the first failing component.
+  - For repeated restarts, compare exit codes via `docker inspect` runbooks before suggesting image reload or data reset.

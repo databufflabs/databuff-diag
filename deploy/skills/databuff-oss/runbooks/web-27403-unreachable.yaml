@@ -1,0 +1,28 @@
+id: web-27403-unreachable
+skill: databuff-oss
+symptoms:
+  - Web UI not loading on port 27403
+  - curl http://host:27403 fails
+  - web health check failed
+  - browser connection refused or timeout to 27403
+checks:
+  - id: compose_ps_web
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml ps ai-apm-web 2>&1"
+    risk: readonly
+  - id: web_health
+    cmd: "curl -sf http://127.0.0.1:27403/health 2>&1 || curl -v http://127.0.0.1:27403/health 2>&1 | tail -20"
+    risk: readonly
+  - id: web_port_listen
+    cmd: "ss -tlnp 2>/dev/null | grep ':27403' || netstat -tlnp 2>/dev/null | grep ':27403' || echo '27403 not listening on host'"
+    risk: readonly
+  - id: web_logs
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs ai-apm-web --tail 80 2>&1"
+    risk: readonly
+  - id: doris_dependency
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml ps ai-apm-doris-fe ai-apm-doris-be 2>&1"
+    risk: readonly
+hints:
+  - Web depends on healthy Doris FE/BE; unhealthy storage layer prevents web from becoming ready.
+  - Health endpoint is http://127.0.0.1:27403/health; UI is the same host/port without /health.
+  - Default login after install is admin / Databuff@123 — only mention if install completed successfully.
+  - If port 27403 is in use by another process, compose may fail to bind — check port listen output and install script port conflict hints.

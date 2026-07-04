@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>预览</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body class="preview-page">
+  <header class="preview-bar">
+    <span id="file-preview-path" class="preview-bar-path"></span>
+    <span class="preview-bar-right">
+      <span id="file-preview-meta" class="preview-bar-meta"></span>
+      <button type="button" class="preview-bar-edit" id="file-preview-edit" hidden title="编辑文件">编辑</button>
+      <button type="button" class="preview-bar-cancel-edit" id="file-preview-cancel-edit" hidden title="返回预览">取消</button>
+      <button type="button" class="preview-bar-save" id="file-preview-save" hidden title="保存 (Ctrl+S)">保存</button>
+      <button type="button" class="preview-bar-close" id="file-preview-close" aria-label="关闭" title="Esc 关闭">×</button>
+    </span>
+  </header>
+  <main class="preview-code">
+    <div id="file-preview-editor-wrap" class="preview-editor-wrap" hidden>
+      <div id="file-preview-editor-gutter" class="preview-editor-gutter" aria-hidden="true"></div>
+      <textarea id="file-preview-editor" class="preview-editor" spellcheck="false"></textarea>
+    </div>
+    <table class="code-preview-table" id="file-preview-table">
+      <tbody id="file-preview-tbody"></tbody>
+    </table>
+  </main>
+  <footer class="preview-footer" id="file-preview-footer" hidden>
+    <div class="preview-footer-title">语法错误</div>
+    <div class="preview-diagnostics" id="file-preview-diagnostics"></div>
+  </footer>
+  <script src="/code-view.js"></script>
+  <script src="/preview.js"></script>
+</body>
+</html>

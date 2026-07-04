@@ -1,0 +1,26 @@
+id: host-resources
+skill: generic-infra
+symptoms:
+  - disk full or no space left on device
+  - out of memory or swap thrashing
+  - high load or host unresponsive
+checks:
+  - id: df_h
+    cmd: "df -h"
+    risk: readonly
+  - id: df_inodes
+    cmd: "df -i"
+    risk: readonly
+  - id: free_m
+    cmd: "free -m"
+    risk: readonly
+  - id: uptime_load
+    cmd: "uptime"
+    risk: readonly
+  - id: top_disk_usage
+    cmd: "du -xh --max-depth=1 /var /tmp /home 2>/dev/null | sort -hr | head -15"
+    risk: readonly
+hints:
+  - On Linux, check both capacity (`df -h`) and inode exhaustion (`df -i`).
+  - Compare `free -m` available vs buffers/cache; low available with high cache may still be healthy.
+  - If root or `/var` is above 90%, inspect largest directories before recommending cleanup.

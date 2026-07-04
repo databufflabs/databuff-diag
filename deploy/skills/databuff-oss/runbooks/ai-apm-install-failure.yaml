@@ -1,0 +1,35 @@
+id: ai-apm-install-failure
+skill: databuff-oss
+symptoms:
+  - ai-apm-install.sh failed or exited non-zero
+  - curl install script download error
+  - install step 1/5 environment check failed
+  - install step 2/5 package download failed
+  - install step 5/5 start.sh failed
+checks:
+  - id: install_dir_exists
+    cmd: "test -d /opt/databuff-ai-apm && ls -la /opt/databuff-ai-apm || echo 'install dir missing or incomplete'"
+    risk: readonly
+  - id: whoami_root_hint
+    cmd: "id -u; echo 'install script requires root (id -u = 0)'"
+    risk: readonly
+  - id: prereq_bins
+    cmd: "for c in curl tar docker; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c: ok\" || echo \"$c: MISSING\"; done"
+    risk: readonly
+  - id: docker_daemon
+    cmd: "docker info 2>&1 | head -20 || echo 'docker info failed'"
+    risk: readonly
+  - id: compose_version
+    cmd: "docker compose version 2>&1 || docker-compose version 2>&1 || echo 'no compose CLI'"
+    risk: readonly
+  - id: port_conflicts
+    cmd: "ss -tlnp 2>/dev/null | grep -E ':27403|:4317|:4318|:8030|:9030|:8040' || netstat -tlnp 2>/dev/null | grep -E ':27403|:4317|:4318|:8030|:9030|:8040' || echo 'could not list listening ports'"
+    risk: readonly
+  - id: install_log_tail
+    cmd: "ls -lt /tmp/apm-install* 2>/dev/null | head -5; journalctl -n 30 --no-pager 2>/dev/null | tail -15 || true"
+    risk: readonly
+hints:
+  - Install must run as root; missing curl/tar/docker or inactive Docker daemon fails step (1/5).
+  - Step (2/5) needs outbound HTTPS to APM_PKG_BASE (default https://databuff.ai/databuff); proxy/firewall blocks show as curl errors.
+  - If install dir is missing after failure, re-run with network access or use offline bundle per DataBuff docs.
+  - Port conflicts on 27403, 4317, 4318, or Doris ports prevent clean start — free ports or adjust compose mapping.

@@ -1,0 +1,27 @@
+id: doris-fe-unhealthy
+skill: databuff-oss
+symptoms:
+  - Doris FE unhealthy or restarting
+  - compose_up_wait failed waiting for doris-fe
+  - port 8030 or 9030 not listening
+  - Doris initialization timeout
+checks:
+  - id: compose_ps_fe
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml ps ai-apm-doris-fe 2>&1"
+    risk: readonly
+  - id: fe_health_ports
+    cmd: "curl -sf http://127.0.0.1:8030/api/bootstrap 2>&1 || echo 'FE bootstrap HTTP failed'; bash -c 'exec 3<>/dev/tcp/127.0.0.1/9030' 2>&1 && echo '9030 open' || echo '9030 closed'"
+    risk: readonly
+  - id: fe_logs
+    cmd: "docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs ai-apm-doris-fe --tail 80 2>&1"
+    risk: readonly
+  - id: fe_inspect
+    cmd: "docker inspect ai-apm-doris-fe --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} exit={{.State.ExitCode}} restarting={{.State.Restarting}}' 2>&1"
+    risk: readonly
+  - id: host_memory
+    cmd: "free -m; df -h /opt/databuff-ai-apm/data 2>/dev/null || df -h /opt"
+    risk: readonly
+hints:
+  - FE healthcheck probes 9030 and http://127.0.0.1:8030/api/bootstrap; start_period is 120s — first boot can be slow.
+  - "Common causes: insufficient memory (FE limit 2g, heap patched to ~1200m), disk full under data/fe-meta, port 8030/9030 already in use."
+  - If FE logs show meta corruption, do not delete data without user approval; suggest backup before reset.
