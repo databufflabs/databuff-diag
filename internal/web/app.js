@@ -185,6 +185,20 @@
     window.history[method]({ sessionId: patch.sessionId, view: patch.view }, "", next);
   }
 
+  function isLlmConfigured(cfg) {
+    if (!cfg || !cfg.llm || !cfg.llm.active) {
+      return false;
+    }
+    var inst = (cfg.llm.providers || {})[cfg.llm.active];
+    if (!inst || !inst.enabled) {
+      return false;
+    }
+    if (cfg.llm.active === "ollama") {
+      return true;
+    }
+    return !!inst.api_key;
+  }
+
   function activateView(name) {
     Object.keys(views).forEach(function (key) {
       var view = views[key];
@@ -197,7 +211,14 @@
 
     if (name === "settings") {
       settingsPanel.ensureLoaded();
+    } else if (name === "chat" && chatPanel && chatPanel.refreshLlmState) {
+      chatPanel.refreshLlmState();
     }
+  }
+
+  function openLlmSettings() {
+    activateView("settings");
+    settingsPanel.activateTab("llm");
   }
 
   document.querySelectorAll("[data-view]").forEach(function (btn) {
@@ -715,7 +736,27 @@
       if (els.uploadBtn) {
         els.uploadBtn.disabled = true;
       }
-      els.tree.innerHTML = '<p class="file-tree-empty">选择或新建会话后显示工作区文件</p>';
+      els.tree.innerHTML = '<div class="file-tree-empty">' +
+        '<span class="file-tree-empty-icon" aria-hidden="true">' +
+        '<svg width="28" height="28" viewBox="0 0 16 16" fill="none">' +
+        '<path d="M3 2.5h6.5L13 6v6.5a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2"/>' +
+        '<path d="M9.5 2.5V6H13" stroke="currentColor" stroke-width="1.2"/>' +
+        "</svg></span>" +
+        "<p class=\"file-tree-empty-title\">选择或新建会话</p>" +
+        "<p class=\"file-tree-empty-desc\">工作区文件将显示在这里</p></div>";
+    }
+
+    function createFileTreeEmpty(title, desc) {
+      var empty = document.createElement("div");
+      empty.className = "file-tree-empty";
+      empty.innerHTML =
+        '<span class="file-tree-empty-icon" aria-hidden="true">' +
+        '<svg width="28" height="28" viewBox="0 0 16 16" fill="none">' +
+        '<path d="M2 4.5h5l1.5 1.5H14v7a1 1 0 01-1 1H2a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+        "</svg></span>" +
+        '<p class="file-tree-empty-title">' + escapeHtml(title) + "</p>" +
+        '<p class="file-tree-empty-desc">' + escapeHtml(desc) + "</p>";
+      return empty;
     }
 
     function sessionQuery(prefix) {
@@ -747,10 +788,7 @@
 
       var entries = data.entries || [];
       if (!entries.length && !data.path) {
-        var empty = document.createElement("p");
-        empty.className = "file-tree-empty";
-        empty.textContent = "目录为空";
-        els.tree.appendChild(empty);
+        els.tree.appendChild(createFileTreeEmpty("目录为空", "上传或新建文件后在此管理"));
         return;
       }
 
@@ -1214,6 +1252,7 @@
     var searchQuery = "";
     var modalOpen = false;
     var activeTab = "llm";
+    var onConfigSaved = null;
     var editingHostId = null;
     var hostModalOpen = false;
     var hostSearchQuery = "";
@@ -2065,6 +2104,9 @@
           getDraft(selectedCode);
           renderCards();
           showSaveStatus(true, "配置已保存，已切换为当前提供商");
+          if (typeof onConfigSaved === "function") {
+            onConfigSaved(saved);
+          }
           window.setTimeout(closeProviderModal, 900);
         })
         .catch(function (err) {
@@ -2188,6 +2230,9 @@
       initTabFromUrl: function (tab) {
         activateTab(tab === "hosts" ? "hosts" : "llm");
       },
+      setOnConfigSaved: function (fn) {
+        onConfigSaved = fn;
+      },
     };
   })();
 
@@ -2207,6 +2252,8 @@
     var els = {
       policy: document.getElementById("field-policy-mode"),
       error: document.getElementById("chat-error"),
+      llmNotice: document.getElementById("chat-llm-notice"),
+      llmNoticeLink: document.getElementById("chat-llm-notice-link"),
       messages: document.getElementById("chat-messages"),
       approvals: document.getElementById("chat-approvals"),
       form: document.getElementById("chat-form"),
@@ -2642,17 +2689,22 @@
       return "系统";
     }
 
-    function roleAvatar(role) {
-      if (role === "user") {
-        return "我";
-      }
+    function createRoleAvatar(role) {
+      var avatar = document.createElement("div");
+      avatar.className = "chat-msg-avatar";
+      avatar.setAttribute("aria-hidden", "true");
       if (role === "assistant") {
-        return "AI";
+        avatar.classList.add("chat-msg-avatar-brand");
+        var img = document.createElement("img");
+        img.src = "/favicon.svg";
+        img.alt = "";
+        img.width = 18;
+        img.height = 18;
+        avatar.appendChild(img);
+        return avatar;
       }
-      if (role === "tool") {
-        return "Shell";
-      }
-      return "!";
+      avatar.textContent = role === "user" ? "我" : role === "tool" ? "Shell" : "!";
+      return avatar;
     }
 
     function roleClass(role) {
@@ -2814,10 +2866,7 @@
       wrap.className = "chat-msg " + roleClass(msg.role);
       wrap.dataset.messageId = msg.id || "";
 
-      var avatar = document.createElement("div");
-      avatar.className = "chat-msg-avatar";
-      avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = roleAvatar(msg.role);
+      var avatar = createRoleAvatar(msg.role);
 
       var content = document.createElement("div");
       content.className = "chat-msg-content";
@@ -2825,18 +2874,21 @@
       var meta = document.createElement("div");
       meta.className = "chat-msg-meta";
       var timeText = formatMessageTime(msg.timestamp);
+      var roleBadge = '<span class="chat-role-badge">' + escapeHtml(roleLabel(msg.role)) + "</span>";
       if (msg.role === "tool") {
         var scopeLabel = executionScopeLabel(msg.command, msg);
         meta.innerHTML =
-          escapeHtml(roleLabel(msg.role)) +
+          roleBadge +
           ' <span class="tool-scope-badge" title="' +
           escapeHtml(executionScopeHint(msg.command, msg)) +
           '">' +
           escapeHtml(scopeLabel) +
           "</span>" +
-          (timeText ? " · " + escapeHtml(timeText) : "");
+          (timeText ? '<span class="chat-msg-time">' + escapeHtml(timeText) + "</span>" : "");
       } else {
-        meta.textContent = roleLabel(msg.role) + (timeText ? " · " + timeText : "");
+        meta.innerHTML =
+          roleBadge +
+          (timeText ? '<span class="chat-msg-time">' + escapeHtml(timeText) + "</span>" : "");
       }
 
       var body = document.createElement("div");
@@ -2905,6 +2957,10 @@
       title.className = "chat-empty-title";
       title.textContent = "开始环境诊断";
 
+      var desc = document.createElement("p");
+      desc.className = "chat-empty-desc";
+      desc.textContent = "描述你遇到的问题，或从下方快捷入口开始排查";
+
       var suggestions = document.createElement("div");
       suggestions.className = "chat-empty-suggestions";
       EMPTY_SUGGESTIONS.forEach(function (text) {
@@ -2923,6 +2979,7 @@
 
       empty.appendChild(icon);
       empty.appendChild(title);
+      empty.appendChild(desc);
       empty.appendChild(suggestions);
       return empty;
     }
@@ -3121,6 +3178,25 @@
       filesPanel.setSession(sessionId);
     }
 
+    function updateLlmNotice() {
+      if (!els.llmNotice) {
+        return;
+      }
+      show(els.llmNotice, !isLlmConfigured(config));
+    }
+
+    function refreshLlmState() {
+      return loadConfig().then(function (cfg) {
+        updateLlmNotice();
+        return cfg;
+      });
+    }
+
+    function onConfigSaved(cfg) {
+      config = cfg;
+      updateLlmNotice();
+    }
+
     function loadConfig() {
       return apiFetch("/api/config").then(function (cfg) {
         config = cfg;
@@ -3129,6 +3205,7 @@
         } else if (!session) {
           els.policy.value = "write_approval";
         }
+        updateLlmNotice();
         return cfg;
       });
     }
@@ -3322,6 +3399,12 @@
         .catch(function (err) {
           setError("初始化会话失败: " + err.message);
         });
+
+      if (els.llmNoticeLink) {
+        els.llmNoticeLink.addEventListener("click", function () {
+          openLlmSettings();
+        });
+      }
     }
 
     function persistPolicyDefault(mode) {
@@ -3417,17 +3500,14 @@
       wrap.className = "chat-msg chat-msg-assistant streaming is-thinking";
       wrap.id = "chat-streaming-msg";
 
-      var avatar = document.createElement("div");
-      avatar.className = "chat-msg-avatar";
-      avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = "AI";
+      var avatar = createRoleAvatar("assistant");
 
       var content = document.createElement("div");
       content.className = "chat-msg-content";
 
       var meta = document.createElement("div");
       meta.className = "chat-msg-meta";
-      meta.textContent = "助手";
+      meta.innerHTML = '<span class="chat-role-badge">助手</span>';
 
       var body = document.createElement("div");
       body.className = "chat-msg-body";
@@ -3947,12 +4027,15 @@
 
     return {
       init: init,
+      refreshLlmState: refreshLlmState,
+      onConfigSaved: onConfigSaved,
     };
   })();
 
   authPanel.setOnAuthenticated(function () {
     chatPanel.init();
     filesPanel.init();
+    settingsPanel.setOnConfigSaved(chatPanel.onConfigSaved);
   });
   authPanel.checkSession();
 })();

@@ -19,17 +19,49 @@
       <div class="login-bg-orb login-bg-orb-3"></div>
       <div class="login-bg-grid"></div>
     </div>
-    <div class="login-card">
-      <div class="login-brand">
-        <span class="brand-mark login-logo" aria-hidden="true">
-          <img src="/favicon.svg" alt="" width="36" height="36">
-        </span>
-        <div class="login-brand-text">
-          <h1 class="login-title">DataBuff Diag</h1>
-          <p class="login-subtitle">Databuff 诊断助手</p>
+    <div class="login-layout">
+      <section class="login-hero">
+        <div class="login-hero-brand">
+          <span class="brand-mark login-logo" aria-hidden="true">
+            <img src="/favicon.svg" alt="" width="40" height="40">
+          </span>
+          <div class="login-hero-brand-text">
+            <span class="login-hero-name">
+              <span class="brand-name-primary">DataBuff</span>
+              <span class="brand-name-accent">Diag</span>
+            </span>
+            <span class="login-hero-tag">现场诊断助手</span>
+          </div>
         </div>
-      </div>
-      <form id="login-form" class="login-form" autocomplete="on">
+        <h1 class="login-hero-title">连接环境，<br>智能定位根因</h1>
+        <p class="login-hero-desc">通过 SSH 远程排查、命令审批与工作区协作，让故障诊断更高效、更可控。</p>
+        <ul class="login-hero-features">
+          <li class="login-hero-feature">
+            <span class="login-hero-feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            </span>
+            <span>SSH 远程主机诊断</span>
+          </li>
+          <li class="login-hero-feature">
+            <span class="login-hero-feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l6.5 3.75v5.5L8 14.5 1.5 10.75v-5.5L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8l1.5 1.5L10.5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span>危险命令安全审批</span>
+          </li>
+          <li class="login-hero-feature">
+            <span class="login-hero-feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h6.5L13 6v6.5a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 2.5V6H13" stroke="currentColor" stroke-width="1.3"/></svg>
+            </span>
+            <span>诊断工作区文件管理</span>
+          </li>
+        </ul>
+      </section>
+      <div class="login-card">
+        <div class="login-card-header">
+          <h2 class="login-title">欢迎回来</h2>
+          <p class="login-subtitle">登录以继续诊断会话</p>
+        </div>
+        <form id="login-form" class="login-form" autocomplete="on">
         <div class="form-row">
           <label class="form-label" for="login-username">用户名</label>
           <input class="form-input login-input" type="text" id="login-username" name="username" autocomplete="username" required>
@@ -54,6 +86,7 @@
           <span class="btn-label">登录</span>
         </button>
       </form>
+      </div>
     </div>
   </div>
 
@@ -124,6 +157,16 @@
 
         <form id="chat-form" class="chat-composer" novalidate>
           <div class="chat-composer-box">
+            <div id="chat-llm-notice" class="chat-llm-notice" role="status" hidden>
+              <svg class="chat-llm-notice-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M8 5v3.25M8 10.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span class="chat-llm-notice-text">
+                尚未配置大模型，
+                <button type="button" class="chat-llm-notice-link" id="chat-llm-notice-link">前往模型配置</button>
+              </span>
+            </div>
             <div id="chat-attachments" class="chat-attachments" hidden></div>
             <div class="chat-composer-inner">
               <input
