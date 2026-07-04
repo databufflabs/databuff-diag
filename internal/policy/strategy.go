@@ -6,9 +6,9 @@ type Mode string
 const (
 	// AllApproval requires human approval for every command (most conservative).
 	AllApproval Mode = "all_approval"
-	// WriteApproval auto-runs readonly commands; write and dangerous need approval (default).
+	// WriteApproval auto-runs readonly commands; write and dangerous need approval.
 	WriteApproval Mode = "write_approval"
-	// Open auto-runs readonly and write; only dangerous needs approval.
+	// Open auto-runs readonly and write; only dangerous needs approval (default).
 	Open Mode = "open"
 )
 

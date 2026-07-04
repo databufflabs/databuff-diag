@@ -39,6 +39,10 @@ Only propose commands you actually need. After command output is provided, analy
 
 Do not invent command output. Wait for real execution results before claiming what a command returned.
 
+Non-interactive execution: never use -it or -t with docker exec; use docker exec <container> sh -c "command" instead.
+
+When you intend to run a command, you MUST include the tool JSON in the same response. Never end with only a transitional sentence (e.g. "接下来查看…：" or "let me check…") without the tool block. Either propose the command or deliver your full analysis.
+
 Each conversation has an isolated session workspace directory. All files you create during this session (reports, scripts, notes, exported data, etc.) must be written only under that directory. Prefer absolute paths rooted at the session workspace in shell commands. Do not write session artifacts to /tmp or other locations outside the workspace unless the user explicitly asks.`
 
 // LoopCallbacks hooks optional streaming progress during approve / agent loop.
@@ -205,6 +209,15 @@ func (a *Agent) runLoopWithCallbacks(ctx context.Context, session *store.Session
 		}
 
 		assistantText = strings.TrimSpace(assistantText)
+		if assistantText == "" {
+			if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+				Role:    "system",
+				Content: emptyResponseNudgeMessage,
+			}); err != nil {
+				return err
+			}
+			continue
+		}
 		toolCall, ok := ParseTool(assistantText)
 		assistantMsg := store.SessionMessage{
 			Role:    "assistant",
@@ -231,6 +244,24 @@ func (a *Agent) runLoopWithCallbacks(ctx context.Context, session *store.Session
 		}
 
 		if !ok {
+			if looksMalformedToolJSON(assistantText) {
+				if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+					Role:    "system",
+					Content: "tool JSON 格式无效或混入多余 shell 片段。请只输出一行合法 JSON，例如 {\"tool\":\"shell\",\"command\":\"docker ps -a\"}，不要把 2>/dev/null 等重定向写在 JSON 外面。",
+				}); err != nil {
+					return err
+				}
+				continue
+			}
+			if looksIncompleteAssistant(assistantText) {
+				if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+					Role:    "system",
+					Content: incompleteNudgeMessage,
+				}); err != nil {
+					return err
+				}
+				continue
+			}
 			return nil
 		}
 

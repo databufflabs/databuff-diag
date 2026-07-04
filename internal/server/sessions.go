@@ -94,7 +94,7 @@ func (h *SessionsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		mode = policy.Mode(cfg.Policy.Default)
 		if mode == "" {
-			mode = policy.WriteApproval
+			mode = policy.Open
 		}
 	}
 

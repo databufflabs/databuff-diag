@@ -149,7 +149,32 @@ func ParseTool(text string) (ToolCall, bool) {
 		}
 	}
 
+	// Single-line bare shell command when the whole message is clearly a command line.
+	if isBareShellLine(text) {
+		return ToolCall{
+			Kind:           ToolShell,
+			ShellCommand:   text,
+			DisplayCommand: text,
+		}, true
+	}
+
 	return ToolCall{}, false
+}
+
+func isBareShellLine(text string) bool {
+	if strings.Contains(text, "\n") || !looksLikeShellCommand(text) {
+		return false
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return false
+	}
+	first := strings.ToLower(words[0])
+	if strings.ContainsAny(words[0], "/.") {
+		return true
+	}
+	_, known := knownCommands[first]
+	return known
 }
 
 func parseJSONSSHTool(text string) (ToolCall, bool) {

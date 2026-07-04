@@ -98,7 +98,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		mode := policy.Mode(cfg.Policy.Default)
 		if mode == "" {
-			mode = policy.WriteApproval
+			mode = policy.Open
 		}
 		session, err = h.SessionStore.Create(mode)
 		if err != nil {

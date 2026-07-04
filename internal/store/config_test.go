@@ -21,8 +21,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.LLM.Active != "" {
 		t.Fatalf("active = %q, want empty", cfg.LLM.Active)
 	}
-	if cfg.Policy.Default != "write_approval" {
-		t.Fatalf("policy.default = %q, want write_approval", cfg.Policy.Default)
+	if cfg.Policy.Default != "open" {
+		t.Fatalf("policy.default = %q, want open", cfg.Policy.Default)
 	}
 	if len(cfg.Skills.Dirs) != 2 {
 		t.Fatalf("skills.dirs len = %d, want 2", len(cfg.Skills.Dirs))

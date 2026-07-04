@@ -208,7 +208,7 @@ func DefaultConfig() *Config {
 				},
 			},
 		},
-		Policy: PolicyConfig{Default: "write_approval"},
+		Policy: PolicyConfig{Default: "open"},
 		SSH: SSHConfig{
 			ControlPath:    filepath.Join(home, "ssh", "%r@%h-%p"),
 			ControlPersist: "10m",

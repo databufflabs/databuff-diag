@@ -124,7 +124,7 @@ func (s *SessionStore) EnsureWorkspaceDir(id string) (string, error) {
 // Create initializes a new session and writes it to disk.
 func (s *SessionStore) Create(policyMode policy.Mode) (*Session, error) {
 	if policyMode == "" {
-		policyMode = policy.WriteApproval
+		policyMode = policy.Open
 	}
 	now := time.Now().UTC()
 	session := &Session{

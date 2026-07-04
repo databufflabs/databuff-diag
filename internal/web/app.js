@@ -3211,7 +3211,7 @@
         if (cfg.policy && cfg.policy.default) {
           els.policy.value = cfg.policy.default;
         } else if (!session) {
-          els.policy.value = "write_approval";
+          els.policy.value = "open";
         }
         updateLlmNotice();
         return cfg;
