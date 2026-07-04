@@ -39,9 +39,10 @@ Linux 发行包为静态链接，不依赖系统 glibc 版本（CentOS 7 / RHEL 
 ```bash
 cd ~/Downloads
 tar -xzf databuff-diag_*.tar.gz
+cd databuff-diag
 ```
 
-**Windows：** 下载得到 `.zip` 文件，右键「全部解压缩」到任意文件夹（例如 `C:\databuff-diag`）。
+**Windows：** 下载得到 `.zip` 文件，右键「全部解压缩」到任意文件夹（例如 `C:\`），会得到 `databuff-diag` 子目录。
 
 **③ 启动**
 
@@ -71,6 +72,7 @@ tar -xzf databuff-diag_*.tar.gz
 **Windows：**
 
 ```powershell
+cd C:\databuff-diag
 .\databuff-diag.exe serve
 ```
 

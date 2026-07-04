@@ -77,7 +77,9 @@ func bailianModelSupportsVision(model string) bool {
 }
 
 func zhipuModelSupportsVision(model string) bool {
-	return strings.Contains(model, "glm-4v") || strings.Contains(model, "vision")
+	return strings.Contains(model, "glm-4v") ||
+		strings.Contains(model, "glm-5v") ||
+		strings.Contains(model, "vision")
 }
 
 func ollamaModelSupportsVision(model string) bool {
@@ -106,5 +108,5 @@ type visionUnsupportedError struct {
 }
 
 func (e *visionUnsupportedError) Error() string {
-	return "当前模型 " + e.model + " 不支持图片输入，请在设置中切换到支持视觉的模型（如 gpt-4o、claude-sonnet 或 qwen-vl）"
+	return "当前模型 " + e.model + " 不支持图片输入，请在设置中切换到支持视觉的模型（如 gpt-5.5、claude-sonnet-5 或 qwen-vl）"
 }

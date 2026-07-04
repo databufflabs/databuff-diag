@@ -197,13 +197,13 @@ func DefaultConfig() *Config {
 	retentionDays := 30
 	return &Config{
 		LLM: LLMConfig{
-			Active: "deepseek",
+			Active: "",
 			Providers: map[string]ProviderInstance{
 				"deepseek": {
 					Enabled:    false,
 					WireAPI:    "openai_compat",
 					BaseURL:    "https://api.deepseek.com/v1",
-					Model:      "deepseek-chat",
+					Model:      "deepseek-v4-flash",
 					TimeoutSec: 120,
 				},
 			},
@@ -229,6 +229,19 @@ func DefaultConfig() *Config {
 			CleanupHour:   &cleanupHour,
 		},
 	}
+}
+
+// normalizeLLMActive clears active when the provider is missing or not enabled.
+func normalizeLLMActive(cfg *Config) bool {
+	if cfg == nil || cfg.LLM.Active == "" {
+		return false
+	}
+	inst, ok := cfg.LLM.Providers[cfg.LLM.Active]
+	if ok && inst.Enabled {
+		return false
+	}
+	cfg.LLM.Active = ""
+	return true
 }
 
 // Load reads config from disk, returning defaults when the file is missing.
@@ -269,11 +282,12 @@ func (s *ConfigStore) Load() (*Config, error) {
 	if cfg.Auth.Password == "" {
 		cfg.Auth.Password = "Databuff@123"
 	}
+	needsNormalize := normalizeLLMActive(cfg)
 	needsMigrate := s.hasPlaintextSecrets(cfg)
 	if err := s.decryptConfigSecrets(cfg); err != nil {
 		return nil, err
 	}
-	if needsMigrate {
+	if needsMigrate || needsNormalize {
 		if saveErr := s.Save(cfg); saveErr != nil {
 			return nil, saveErr
 		}

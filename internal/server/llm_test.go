@@ -26,8 +26,9 @@ func TestLLMTest_OpenAICompat(t *testing.T) {
 
 	handler := testHandler(t)
 	payload := map[string]any{
-		"base_url": srv.URL + "/v1",
-		"model":    "test-model",
+		"provider_code": "deepseek",
+		"base_url":      srv.URL + "/v1",
+		"model":         "test-model",
 	}
 	raw, _ := json.Marshal(payload)
 
@@ -66,6 +67,7 @@ func TestLLMTest_DatabuffUltraResult(t *testing.T) {
 
 	handler := testHandler(t)
 	payload := map[string]any{
+		"provider_code":      "bailian",
 		"base_url":           srv.URL + "/v1",
 		"model":              "qwen-72b",
 		"response_processor": "databuff_ultra_result",
@@ -143,8 +145,9 @@ func TestLLMTest_MethodNotAllowed(t *testing.T) {
 func TestLLMTest_LLMErrorReturnsSuccessFalse(t *testing.T) {
 	handler := testHandler(t)
 	payload := map[string]any{
-		"base_url": "http://127.0.0.1:1",
-		"model":    "test-model",
+		"provider_code": "deepseek",
+		"base_url":      "http://127.0.0.1:1",
+		"model":         "test-model",
 	}
 	raw, _ := json.Marshal(payload)
 

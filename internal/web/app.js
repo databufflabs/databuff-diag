@@ -199,6 +199,14 @@
     return !!inst.api_key;
   }
 
+  function isProviderInUse(cfg, code) {
+    if (!cfg || !cfg.llm || cfg.llm.active !== code) {
+      return false;
+    }
+    var inst = (cfg.llm.providers || {})[code];
+    return !!(inst && inst.enabled);
+  }
+
   function activateView(name) {
     Object.keys(views).forEach(function (key) {
       var view = views[key];
@@ -1592,7 +1600,7 @@
         card.type = "button";
         card.className = "provider-card";
         card.dataset.code = p.provider_code;
-        if (config && config.llm && config.llm.active === p.provider_code) {
+        if (isProviderInUse(config, p.provider_code)) {
           card.classList.add("active-provider");
         }
 
@@ -1630,7 +1638,7 @@
         hint.textContent = "点击配置 →";
         card.appendChild(hint);
 
-        if (config && config.llm && config.llm.active === p.provider_code) {
+        if (isProviderInUse(config, p.provider_code)) {
           var badge = document.createElement("span");
           badge.className = "provider-card-badge";
           badge.textContent = "使用中";

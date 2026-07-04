@@ -18,8 +18,8 @@ func testHome(t *testing.T) string {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.LLM.Active != "deepseek" {
-		t.Fatalf("active = %q, want deepseek", cfg.LLM.Active)
+	if cfg.LLM.Active != "" {
+		t.Fatalf("active = %q, want empty", cfg.LLM.Active)
 	}
 	if cfg.Policy.Default != "write_approval" {
 		t.Fatalf("policy.default = %q, want write_approval", cfg.Policy.Default)
@@ -37,8 +37,8 @@ func TestLoadSaveCreatesFileWithMode0600(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.LLM.Active != "deepseek" {
-		t.Fatalf("active = %q, want deepseek", cfg.LLM.Active)
+	if cfg.LLM.Active != "" {
+		t.Fatalf("active = %q, want empty", cfg.LLM.Active)
 	}
 
 	info, err := os.Stat(store.Path())
@@ -47,6 +47,34 @@ func TestLoadSaveCreatesFileWithMode0600(t *testing.T) {
 	}
 	if info.Mode().Perm() != configFileMode {
 		t.Fatalf("mode = %o, want %o", info.Mode().Perm(), configFileMode)
+	}
+}
+
+func TestLoadClearsActiveWhenProviderDisabled(t *testing.T) {
+	home := testHome(t)
+	path := filepath.Join(home, ".databuff-diag", "config.yaml")
+	store := NewConfigStoreAt(path)
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	raw := []byte(`llm:
+  active: deepseek
+  providers:
+    deepseek:
+      enabled: false
+      model: deepseek-chat
+`)
+	if err := os.WriteFile(path, raw, configFileMode); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.LLM.Active != "" {
+		t.Fatalf("active = %q, want empty after normalize", loaded.LLM.Active)
 	}
 }
 

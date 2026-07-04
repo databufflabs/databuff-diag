@@ -3,73 +3,73 @@ providers:
     display_name: OpenAI
     default_base_url: https://api.openai.com/v1
     default_wire_api: openai_compat
-    default_model: gpt-4o
+    default_model: gpt-5.5
 
   - provider_code: anthropic
     display_name: Anthropic
     default_base_url: https://api.anthropic.com
     default_wire_api: anthropic
-    default_model: claude-sonnet-4-20250514
+    default_model: claude-sonnet-5
 
   - provider_code: deepseek
     display_name: DeepSeek
     default_base_url: https://api.deepseek.com/v1
     default_wire_api: openai_compat
-    default_model: deepseek-chat
+    default_model: deepseek-v4-flash
 
   - provider_code: moonshot
     display_name: Moonshot
     default_base_url: https://api.moonshot.cn/v1
     default_wire_api: openai_compat
-    default_model: moonshot-v1-8k
+    default_model: kimi-k2.6
 
   - provider_code: zhipu
     display_name: 智谱
     default_base_url: https://open.bigmodel.cn/api/paas/v4
     default_wire_api: openai_compat
-    default_model: glm-4-flash
+    default_model: glm-5.2
 
   - provider_code: bailian
     display_name: 阿里云百炼
     default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
     default_wire_api: openai_compat
-    default_model: qwen-plus
+    default_model: qwen3.7-max
 
   - provider_code: qianfan
     display_name: 百度千帆
     default_base_url: https://qianfan.baidubce.com/v2
     default_wire_api: openai_compat
-    default_model: ernie-4.0-8k
+    default_model: ernie-5.1
 
   - provider_code: minimax
     display_name: MiniMax
     default_base_url: https://api.minimax.chat/v1
     default_wire_api: openai_compat
-    default_model: abab6.5s-chat
+    default_model: MiniMax-M3
 
   - provider_code: ollama
     display_name: Ollama 本地
     default_base_url: http://127.0.0.1:11434/v1
     default_wire_api: openai_compat
-    default_model: llama3.2
+    default_model: qwen3:30b
 
   - provider_code: openrouter
     display_name: OpenRouter
     default_base_url: https://openrouter.ai/api/v1
     default_wire_api: openai_compat
-    default_model: openai/gpt-4o
+    default_model: openai/gpt-5.5
 
   - provider_code: groq
     display_name: Groq
     default_base_url: https://api.groq.com/openai/v1
     default_wire_api: openai_compat
-    default_model: llama-3.3-70b-versatile
+    default_model: openai/gpt-oss-120b
 
   - provider_code: together
     display_name: Together
     default_base_url: https://api.together.xyz/v1
     default_wire_api: openai_compat
-    default_model: meta-llama/Llama-3.3-70B-Instruct-Turbo
+    default_model: Qwen/Qwen3.7-Max
 
   - provider_code: custom
     display_name: 自定义
