@@ -2641,15 +2641,15 @@
 
     function executionScopeHint(command, msg) {
       if (/^\s*ssh\b/.test(command || "")) {
-        return "通过 SSH 在远程主机执行（凭据由系统注入）";
+        return "在远程主机执行";
       }
       if (msg && msg.tool_kind === "ssh") {
-        return "通过 SSH 在远程主机执行（凭据由系统注入）";
+        return "在远程主机执行";
       }
       if (/^\s*(ssh|sshpass)\b/.test(command || "")) {
-        return "通过 SSH 在远程主机执行";
+        return "在远程主机执行";
       }
-      return "在 DataBuff 所在机器上执行，非远程主机";
+      return "在本机执行";
     }
 
     function toolExecutionWarning(msg, index, messages) {
@@ -2669,7 +2669,7 @@
         }
         var text = prior.content || "";
         if (/\bssh\b/i.test(text) || /\d{1,3}(?:\.\d{1,3}){3}/.test(text)) {
-          return "此命令在本机执行。您提到了远程主机，助手应使用 SSH 工具连接该主机。";
+          return "此命令在本机执行，无法直接连接您提到的远程主机。";
         }
         break;
       }

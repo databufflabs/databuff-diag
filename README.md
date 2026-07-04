@@ -95,8 +95,6 @@ tar -xzf databuff-diag_*.tar.gz
 2. 填写服务器 IP、用户名、密码
 3. 保存
 
-远程机器只需正常开启 SSH 服务，无需安装 sshpass。
-
 ![添加远程主机](docs/images/settings-ssh.png)
 
 ---
@@ -126,7 +124,7 @@ AI 会自动执行命令并把结果告诉你。如果弹出「待批准」提�
 | 网页打不开 | 确认终端里 `databuff-diag serve` 还在运行 |
 | 登录不了 | 检查用户名 `Admin`、密码 `Databuff@123` |
 | 对话没反应 | 回到 **设置 → 大模型**，确认已「保存并启用」且测试连接成功 |
-| 连不上远程机器 | 检查 IP、用户名、密码是否正确；确认远程已开启 SSH。密码登录**不需要**在远程安装 sshpass；本机未装 sshpass 时会自动使用内置方式，也可选安装（Mac：`brew install sshpass`）或改用 SSH 密钥登录 |
+| 连不上远程机器 | 检查 IP、用户名、密码是否正确 |
 
 ---
 

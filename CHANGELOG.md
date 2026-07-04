@@ -4,7 +4,7 @@
 
 ### Added
 
-- Windows 支持：`windows_amd64` 发布包（`.zip`）、本机命令执行、SSH 密码登录（无需 sshpass）。
+- Windows 10/11 支持。
 
 ## [0.1.0] - 2026-07-04
 
