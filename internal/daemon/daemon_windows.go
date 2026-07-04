@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func startDetached(opts Options) error {
@@ -38,10 +40,10 @@ func startDetached(opts Options) error {
 }
 
 func processAlive(pid int) bool {
-	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {
 		return false
 	}
-	_ = syscall.CloseHandle(handle)
+	_ = windows.CloseHandle(handle)
 	return true
 }
