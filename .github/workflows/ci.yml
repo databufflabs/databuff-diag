@@ -65,6 +65,9 @@ jobs:
           ls -lh "databuff-diag-${{ matrix.goos }}-${{ matrix.goarch }}"
           bytes=$(stat -c%s "databuff-diag-${{ matrix.goos }}-${{ matrix.goarch }}")
           test "$bytes" -lt 31457280
+          if [ "${{ matrix.goos }}" = linux ]; then
+            file "databuff-diag-${{ matrix.goos }}-${{ matrix.goarch }}" | grep -q 'statically linked'
+          fi
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
@@ -88,3 +91,16 @@ jobs:
 
       - name: List snapshot artifacts
         run: ls -lh dist/
+
+      - name: Verify Linux release binaries are statically linked
+        run: |
+          for bin in dist/databuff-diag_linux_amd64_v1/databuff-diag \
+                     dist/databuff-diag_linux_arm64_v8.0/databuff-diag; do
+            echo "checking $bin"
+            file "$bin" | grep -q 'statically linked'
+            if strings "$bin" | grep -qE '^GLIBC_2\.(3[2-9]|[4-9][0-9])'; then
+              echo "unexpected glibc version dependency in $bin" >&2
+              strings "$bin" | grep '^GLIBC_' | sort -Vu
+              exit 1
+            fi
+          done

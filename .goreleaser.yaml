@@ -2,6 +2,11 @@ version: 2
 
 project_name: databuff-diag
 
+# Pure Go static binaries: run on older Linux (CentOS 7+, RHEL 8, etc.)
+# without tying releases to the CI runner's glibc version.
+env:
+  - CGO_ENABLED=0
+
 before:
   hooks:
     - go mod tidy

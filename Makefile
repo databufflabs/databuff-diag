@@ -3,12 +3,17 @@ BINARY := $(BINARY_DIR)/databuff-diag
 MAIN_PKG := ./cmd/databuff-diag
 VERSION ?= dev
 LDFLAGS := -ldflags "-s -w -X github.com/databufflabs/databuff-diag/internal/version.Version=$(VERSION)"
+export CGO_ENABLED := 0
 
-.PHONY: build test lint clean release snapshot size
+.PHONY: build build-linux-amd64 test lint clean release snapshot size
 
 build:
 	@mkdir -p $(BINARY_DIR)
 	go build $(LDFLAGS) -o $(BINARY) $(MAIN_PKG)
+
+# Cross-compile a Linux amd64 binary for older servers (no glibc pin to build host).
+build-linux-amd64:
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o databuff-diag-linux-amd64 $(MAIN_PKG)
 
 test:
 	go test ./...

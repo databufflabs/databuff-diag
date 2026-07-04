@@ -30,6 +30,8 @@
 | Linux 服务器（ARM64） | `linux_arm64` |
 | Windows（64 位） | `windows_amd64`（`.zip` 压缩包） |
 
+Linux 发行包为静态链接，不依赖系统 glibc 版本（CentOS 7 / RHEL 8 等旧环境可直接运行）。
+
 **② 解压**
 
 **Mac / Linux：** 下载得到 `.tar.gz` 文件。打开「终端」（Mac 在「启动台 → 其他 → 终端」），执行：
