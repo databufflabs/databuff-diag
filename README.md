@@ -49,13 +49,34 @@ tar -xzf databuff-diag_*.tar.gz
 ./databuff-diag serve
 ```
 
-**Windows：** 打开「命令提示符」或 PowerShell，进入解压目录后执行：
+默认后台运行，关闭终端后服务仍继续。看到类似输出表示成功：
+
+```
+✓ databuff-diag 启动成功，访问 http://127.0.0.1:8787
+  日志: /Users/你/.databuff-diag/databuff-diag.log
+  PID:  12345
+```
+
+查看日志：`tail -f ~/.databuff-diag/databuff-diag.log`  
+停止服务：`kill $(cat ~/.databuff-diag/databuff-diag.pid)`
+
+如需前台运行（关闭终端即停止）：
+
+```bash
+./databuff-diag serve --foreground
+```
+
+**Windows：**
 
 ```powershell
 .\databuff-diag.exe serve
 ```
 
-看到 `databuff-diag listening on :8787` 表示启动成功。**不要关闭这个终端窗口**，关了程序就停了。
+前台运行：
+
+```powershell
+.\databuff-diag.exe serve --foreground
+```
 
 ---
 
@@ -122,7 +143,7 @@ AI 会自动执行命令并把结果告诉你。如果弹出「待批准」提�
 
 | 问题 | 怎么办 |
 |------|--------|
-| 网页打不开 | 确认终端里 `databuff-diag serve` 还在运行 |
+| 网页打不开 | 确认服务在运行：`cat ~/.databuff-diag/databuff-diag.pid` 或重新执行 `serve` |
 | 登录不了 | 检查用户名 `Admin`、密码 `Databuff@123` |
 | 对话没反应 | 回到 **设置 → 大模型**，确认已「保存并启用」且测试连接成功 |
 | 连不上远程机器 | 检查 IP、用户名、密码是否正确 |

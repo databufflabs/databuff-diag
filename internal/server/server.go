@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,7 +76,7 @@ func NewWithStores(cfgStore *store.ConfigStore, sessionStore *store.SessionStore
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
+	r.Use(errorLogger)
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", HealthHandler)
@@ -170,12 +171,14 @@ func ListenAndServe(addr string) error {
 	NewSessionCleanup(stores.Config, stores.Sessions).Start(context.Background())
 
 	handler := NewWithStores(stores.Config, stores.Sessions, stores.Attachments)
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
 	}
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("listen and serve: %w", err)
+	fmt.Printf("✓ databuff-diag 启动成功，访问 %s\n", ServeURL(addr))
+	srv := &http.Server{Handler: handler}
+	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
 }

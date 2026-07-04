@@ -99,19 +99,10 @@ start_service() {
   mkdir -p "$LOCAL_RUN"
 
   log "starting ${BINARY} on ${LISTEN}"
-  nohup "$BINARY_PATH" serve --listen "$LISTEN" >>"$LOG_FILE" 2>&1 &
-  echo $! >"$PID_FILE"
-
-  if [ "${START_SKIP_READY:-0}" = "1" ]; then
-    log "pid $(cat "$PID_FILE"), log ${LOG_FILE}"
-    return 0
+  if ! "$BINARY_PATH" serve --listen "$LISTEN" --pid-file "$PID_FILE" --log-file "$LOG_FILE"; then
+    die "failed to start; see ${LOG_FILE}"
   fi
 
-  if wait_healthy; then
-    log "ready at http://127.0.0.1:${LISTEN#:}"
-    log "pid $(cat "$PID_FILE"), log ${LOG_FILE}"
-    return 0
-  fi
-
-  die "service did not become healthy; see ${LOG_FILE}"
+  log "ready at http://127.0.0.1:${LISTEN#:}"
+  log "pid $(cat "$PID_FILE"), log ${LOG_FILE}"
 }
