@@ -133,38 +133,44 @@ func (l *Loader) Summaries() []Summary {
 	return out
 }
 
-// SystemPromptContext formats loaded skills for the agent system prompt.
+// SystemPromptContext formats loaded skills for the agent system prompt (Pi-compatible).
 func (l *Loader) SystemPromptContext() string {
 	if len(l.skills) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
-	b.WriteString("## Loaded diagnostic skills\n\n")
-	b.WriteString("Use the following skills and runbooks as reference when diagnosing issues. ")
-	b.WriteString("Follow runbook checks in order when symptoms match; do not invent command output.\n")
-
+	b.WriteString("The following skills provide specialized instructions for specific diagnostic tasks.\n")
+	b.WriteString("Use the read tool to load a skill's SKILL.md when the task matches its description.\n")
+	b.WriteString("When a skill file references a relative path, resolve it against the skill directory.\n")
+	b.WriteString("\n<available_skills>\n")
 	for _, sk := range l.skills {
-		fmt.Fprintf(&b, "\n### %s\n", sk.Name)
-		if sk.Description != "" {
-			fmt.Fprintf(&b, "%s\n", sk.Description)
-		}
-		if sk.Body != "" {
-			fmt.Fprintf(&b, "\n%s\n", sk.Body)
-		}
-		for _, rb := range sk.Runbooks {
-			fmt.Fprintf(&b, "\nRunbook %s", rb.ID)
-			if len(rb.Symptoms) > 0 {
-				fmt.Fprintf(&b, " (symptoms: %s)", strings.Join(rb.Symptoms, "; "))
+		skillPath := filepath.Join(sk.Path, skillFileName)
+		desc := sk.Description
+		if len(sk.Runbooks) > 0 {
+			ids := make([]string, len(sk.Runbooks))
+			for i, rb := range sk.Runbooks {
+				ids[i] = rb.ID
 			}
-			b.WriteString(":\n")
-			for i, check := range rb.Checks {
-				fmt.Fprintf(&b, "  %d. [%s] %s\n", i+1, check.ID, check.Cmd)
-			}
-			for _, hint := range rb.Hints {
-				fmt.Fprintf(&b, "  hint: %s\n", hint)
+			runbookNote := "runbooks: " + strings.Join(ids, ", ")
+			if desc == "" {
+				desc = runbookNote
+			} else {
+				desc += " (" + runbookNote + ")"
 			}
 		}
+		fmt.Fprintf(&b, "  <skill>\n    <name>%s</name>\n", escapeXML(sk.Name))
+		fmt.Fprintf(&b, "    <description>%s</description>\n", escapeXML(desc))
+		fmt.Fprintf(&b, "    <location>%s</location>\n  </skill>\n", escapeXML(skillPath))
 	}
+	b.WriteString("</available_skills>")
 	return strings.TrimSpace(b.String())
+}
+
+func escapeXML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	return strings.ReplaceAll(s, "'", "&apos;")
 }

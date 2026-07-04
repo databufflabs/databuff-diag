@@ -64,6 +64,8 @@ var (
 		"nslookup": true, "host": true, "curl": true, "wget": true,
 		"journalctl": true, "findmnt": true, "mount": true, "which": true, "type": true,
 		"command": true, "pwd": true, "echo": true, "true": true, "false": true,
+		"[": true, "test": true,
+		"cd": true,
 		"find": true, "strings": true, "xxd": true, "od": true, "lsblk": true,
 		"vmstat": true, "iostat": true, "mpstat": true, "sar": true,
 	}
@@ -106,6 +108,19 @@ var (
 	}
 	helmWriteSubcmds = map[string]bool{
 		"install": true, "upgrade": true, "uninstall": true, "rollback": true, "delete": true,
+	}
+
+	gitReadonlySubcmds = map[string]bool{
+		"log": true, "show": true, "status": true, "diff": true, "remote": true,
+		"branch": true, "tag": true, "rev-parse": true, "describe": true,
+		"shortlog": true, "blame": true, "whatchanged": true, "ls-files": true,
+		"ls-remote": true, "grep": true, "name-rev": true, "version": true,
+	}
+	gitWriteSubcmds = map[string]bool{
+		"add": true, "commit": true, "push": true, "pull": true, "merge": true,
+		"rebase": true, "checkout": true, "switch": true, "reset": true, "clean": true,
+		"rm": true, "mv": true, "stash": true, "cherry-pick": true, "revert": true,
+		"clone": true, "init": true, "fetch": true,
 	}
 
 	kubectlValueFlags = map[string]bool{
@@ -252,6 +267,8 @@ func classifyCall(call *syntax.CallExpr) Risk {
 		return classifySystemctl(words)
 	case "helm":
 		return classifyHelm(words)
+	case "git":
+		return classifyGit(words)
 	case "tee":
 		return RiskWrite
 	case "rm":
@@ -334,6 +351,15 @@ func classifySystemctl(words []string) Risk {
 func classifyHelm(words []string) Risk {
 	sub := firstSubcommand(words, 1, nil)
 	return classifySubcommandRisk(sub, helmReadonlySubcmds, helmWriteSubcmds)
+}
+
+func classifyGit(words []string) Risk {
+	sub := firstSubcommand(words, 1, gitValueFlags)
+	return classifySubcommandRisk(sub, gitReadonlySubcmds, gitWriteSubcmds)
+}
+
+var gitValueFlags = map[string]bool{
+	"-C": true, "--git-dir": true, "--work-tree": true, "--namespace": true,
 }
 
 func classifySubcommandRisk(sub string, readonly, write map[string]bool) Risk {

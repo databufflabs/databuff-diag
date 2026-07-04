@@ -48,7 +48,7 @@ func Fork(opts Options) error {
 	}
 
 	pid, _ := readPID(opts.PIDFile)
-	fmt.Printf("✓ databuff-diag 启动成功，访问 %s\n", url)
+	server.PrintStartupBanner(opts.Listen)
 	fmt.Printf("  日志: %s\n", opts.LogFile)
 	if pid > 0 {
 		fmt.Printf("  PID:  %d\n", pid)

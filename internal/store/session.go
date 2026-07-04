@@ -23,6 +23,13 @@ const SessionMetaFilename = "session.json"
 // MaxChatMessageRunes is the maximum number of Unicode code points in a user message.
 const MaxChatMessageRunes = 100000
 
+// StoredToolCall records a native function tool call on an assistant turn.
+type StoredToolCall struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
 // SessionMessage is one turn in a diagnostic conversation.
 type SessionMessage struct {
 	ID          string              `json:"id"`
@@ -30,11 +37,14 @@ type SessionMessage struct {
 	Content     string              `json:"content"`
 	Attachments []MessageAttachment `json:"attachments,omitempty"`
 	Timestamp   time.Time           `json:"timestamp"`
-	Command   string    `json:"command,omitempty"`
-	Stdout    string    `json:"stdout,omitempty"`
-	Stderr    string    `json:"stderr,omitempty"`
-	ExitCode  *int      `json:"exit_code,omitempty"`
-	Risk      string    `json:"risk,omitempty"`
+	Command     string              `json:"command,omitempty"`
+	Stdout      string              `json:"stdout,omitempty"`
+	Stderr      string              `json:"stderr,omitempty"`
+	ExitCode    *int                `json:"exit_code,omitempty"`
+	Risk        string              `json:"risk,omitempty"`
+	ToolCalls   []StoredToolCall    `json:"tool_calls,omitempty"`
+	ToolCallID  string              `json:"tool_call_id,omitempty"`
+	ToolName    string              `json:"tool_name,omitempty"`
 }
 
 // SSHOverride holds session-scoped credentials parsed from user messages.
@@ -54,26 +64,57 @@ type SSHToolPayload struct {
 	RemoteCommand string `json:"remote_command"`
 }
 
+// ReadToolPayload is stored on pending read approvals (rare).
+type ReadToolPayload struct {
+	Path   string `json:"path"`
+	Offset int    `json:"offset,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+}
+
+// WriteToolPayload is stored on pending write approvals.
+type WriteToolPayload struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+// TextEditPayload is one edit in a pending edit approval.
+type TextEditPayload struct {
+	OldText string `json:"oldText"`
+	NewText string `json:"newText"`
+}
+
+// EditToolPayload is stored on pending edit approvals.
+type EditToolPayload struct {
+	Path  string            `json:"path"`
+	Edits []TextEditPayload `json:"edits"`
+}
+
 // PendingApproval is a command waiting for human approval.
 type PendingApproval struct {
-	ID        string          `json:"id"`
-	Command   string          `json:"command"`
-	Risk      policy.Risk     `json:"risk"`
-	Reason    string          `json:"reason,omitempty"`
-	CreatedAt time.Time       `json:"created_at"`
-	ToolKind  string          `json:"tool_kind,omitempty"`
-	SSHTool   *SSHToolPayload `json:"ssh_tool,omitempty"`
+	ID           string           `json:"id"`
+	Command      string           `json:"command"`
+	Risk         policy.Risk      `json:"risk"`
+	Reason       string           `json:"reason,omitempty"`
+	CreatedAt    time.Time        `json:"created_at"`
+	ToolKind     string           `json:"tool_kind,omitempty"`
+	ToolID       string           `json:"tool_id,omitempty"`
+	SSHTool      *SSHToolPayload  `json:"ssh_tool,omitempty"`
+	ReadTool     *ReadToolPayload `json:"read_tool,omitempty"`
+	WriteTool    *WriteToolPayload `json:"write_tool,omitempty"`
+	EditTool     *EditToolPayload `json:"edit_tool,omitempty"`
+	ShellCommand string           `json:"shell_command,omitempty"`
 }
 
 // Session is a persisted diagnostic conversation.
 type Session struct {
-	ID               string                    `json:"id"`
-	CreatedAt        time.Time                 `json:"created_at"`
-	UpdatedAt        time.Time                 `json:"updated_at"`
-	PolicyMode       policy.Mode               `json:"policy_mode"`
-	Messages         []SessionMessage          `json:"messages"`
-	PendingApprovals []PendingApproval         `json:"pending_approvals,omitempty"`
-	SSHOverrides     map[string]SSHOverride    `json:"ssh_overrides,omitempty"`
+	ID                 string                 `json:"id"`
+	CreatedAt          time.Time              `json:"created_at"`
+	UpdatedAt          time.Time              `json:"updated_at"`
+	PolicyMode         policy.Mode            `json:"policy_mode"`
+	Messages           []SessionMessage       `json:"messages"`
+	PendingApprovals   []PendingApproval      `json:"pending_approvals,omitempty"`
+	SSHOverrides       map[string]SSHOverride  `json:"ssh_overrides,omitempty"`
+	CompactionSummary  string                 `json:"compaction_summary,omitempty"`
 }
 
 // SessionStore persists each session under ~/.databuff-diag/sessions/<id>/:

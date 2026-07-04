@@ -3,6 +3,40 @@
 
   var FETCH_CREDENTIALS = { credentials: "include" };
 
+  function copyTextFallback(text) {
+    return new Promise(function (resolve, reject) {
+      var textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, text.length);
+      var ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (e) {
+        ok = false;
+      }
+      document.body.removeChild(textarea);
+      if (ok) {
+        resolve();
+      } else {
+        reject(new Error("copy failed"));
+      }
+    });
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () {
+        return copyTextFallback(text);
+      });
+    }
+    return copyTextFallback(text);
+  }
+
   var authPanel = (function () {
     var els = {
       loginView: document.getElementById("view-login"),
@@ -536,6 +570,10 @@
     return line.replace(/\|/g, "").replace(/[\s:-]/g, "") === "";
   }
 
+  function isMarkdownHorizontalRule(line) {
+    return /^(\*{3,}|-{3,}|_{3,})\s*$/.test((line || "").trim());
+  }
+
   function parseMarkdownTableCells(line) {
     return line
       .trim()
@@ -617,6 +655,13 @@
         if (index < lines.length - 1) {
           html.push('<div class="md-spacer"></div>');
         }
+        index++;
+        continue;
+      }
+
+      if (isMarkdownHorizontalRule(trimmed)) {
+        closeList();
+        html.push('<hr class="md-hr" />');
         index++;
         continue;
       }
@@ -1152,18 +1197,14 @@
       if (!workspaceRootPath || !els.copyPathBtn) {
         return;
       }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(workspaceRootPath).then(function () {
-          els.copyPathBtn.classList.add("is-copied");
-          els.copyPathBtn.title = "已复制路径";
-          setTimeout(function () {
-            els.copyPathBtn.classList.remove("is-copied");
-            els.copyPathBtn.title = "复制路径";
-          }, 1600);
-        });
-      } else {
-        window.prompt("复制工作区路径", workspaceRootPath);
-      }
+      copyTextToClipboard(workspaceRootPath).then(function () {
+        els.copyPathBtn.classList.add("is-copied");
+        els.copyPathBtn.title = "已复制路径";
+        setTimeout(function () {
+          els.copyPathBtn.classList.remove("is-copied");
+          els.copyPathBtn.title = "复制路径";
+        }, 1600);
+      });
     }
 
     function init() {
@@ -2500,7 +2541,14 @@
       true: 1, uname: 1, uniq: 1, uptime: 1, wc: 1, which: 1, whoami: 1, xargs: 1,
     };
 
+    function looksLikeTreeDiagram(text) {
+      return /├──|└──|│/.test(text);
+    }
+
     function plausibleCommandLine(line) {
+      if (looksLikeTreeDiagram(line)) {
+        return false;
+      }
       if (/[;|&<>$()`]/.test(line)) {
         return true;
       }
@@ -2519,7 +2567,7 @@
     }
 
     function looksLikeShellCommand(cmd) {
-      if (!cmd) {
+      if (!cmd || looksLikeTreeDiagram(cmd)) {
         return false;
       }
       var lines = cmd
@@ -2632,6 +2680,9 @@
     }
 
     function executionScopeLabel(command, msg) {
+      if (msg && (msg.tool_name === "read" || msg.tool_name === "write" || msg.tool_name === "edit")) {
+        return "本机文件";
+      }
       if (!command) {
         return "本机";
       }
@@ -2648,6 +2699,9 @@
     }
 
     function executionScopeHint(command, msg) {
+      if (msg && (msg.tool_name === "read" || msg.tool_name === "write" || msg.tool_name === "edit")) {
+        return "本地文件操作";
+      }
       if (/^\s*ssh\b/.test(command || "")) {
         return "在远程主机执行";
       }
@@ -2684,7 +2738,7 @@
       return null;
     }
 
-    function roleLabel(role) {
+    function roleLabel(role, msg) {
       if (role === "user") {
         return "你";
       }
@@ -2692,12 +2746,54 @@
         return "助手";
       }
       if (role === "tool") {
-        return "命令输出";
+        return toolRoleLabel(msg);
       }
       return "系统";
     }
 
-    function createRoleAvatar(role) {
+    function toolRoleLabel(msg) {
+      var name = msg && msg.tool_name;
+      if (name === "read") {
+        return "读取";
+      }
+      if (name === "write") {
+        return "写入";
+      }
+      if (name === "edit") {
+        return "编辑";
+      }
+      if (name === "ssh") {
+        return "SSH";
+      }
+      return "Shell";
+    }
+
+    function toolActionLabel(msg) {
+      var name = msg && msg.tool_name;
+      if (name === "read" || name === "write" || name === "edit") {
+        return "操作";
+      }
+      return "命令";
+    }
+
+    function toolAvatarText(msg) {
+      var name = msg && msg.tool_name;
+      if (name === "read") {
+        return "读";
+      }
+      if (name === "write") {
+        return "写";
+      }
+      if (name === "edit") {
+        return "编";
+      }
+      if (name === "ssh") {
+        return "远";
+      }
+      return "$";
+    }
+
+    function createRoleAvatar(role, msg) {
       var avatar = document.createElement("div");
       avatar.className = "chat-msg-avatar";
       avatar.setAttribute("aria-hidden", "true");
@@ -2711,7 +2807,11 @@
         avatar.appendChild(img);
         return avatar;
       }
-      avatar.textContent = role === "user" ? "我" : role === "tool" ? "Shell" : "!";
+      if (role === "tool") {
+        avatar.textContent = toolAvatarText(msg);
+        return avatar;
+      }
+      avatar.textContent = role === "user" ? "我" : "!";
       return avatar;
     }
 
@@ -2726,6 +2826,42 @@
         return "chat-msg-system";
       }
       return "chat-msg-assistant";
+    }
+
+    var TOOL_STDOUT_MAX_LINES = 20;
+
+    function buildToolOutputSection(label, text, outputClass, collapseAfterLines) {
+      var section = document.createElement("div");
+      section.className = "tool-section";
+      var sectionLabel = document.createElement("div");
+      sectionLabel.className = "tool-section-label";
+      sectionLabel.textContent = label;
+      var pre = document.createElement("pre");
+      pre.className = "tool-output " + outputClass;
+      pre.textContent = text;
+      section.appendChild(sectionLabel);
+      section.appendChild(pre);
+      attachCollapsibleToolOutput(section, pre, collapseAfterLines);
+      return section;
+    }
+
+    function attachCollapsibleToolOutput(section, pre, maxLines) {
+      var lineCount = (pre.textContent || "").split("\n").length;
+      if (lineCount <= maxLines) {
+        return;
+      }
+      section.classList.add("tool-section-collapsible", "is-collapsed");
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "tool-output-toggle";
+      toggle.textContent = "展开全部（" + lineCount + " 行）";
+      toggle.addEventListener("click", function () {
+        var collapsed = section.classList.toggle("is-collapsed");
+        toggle.textContent = collapsed
+          ? "展开全部（" + lineCount + " 行）"
+          : "收起输出";
+      });
+      section.appendChild(toggle);
     }
 
     function buildToolMessageBody(msg, index, messages) {
@@ -2744,7 +2880,7 @@
         var cmdSection = document.createElement("div");
         cmdSection.className = "tool-section";
         cmdSection.innerHTML =
-          '<div class="tool-section-label">命令</div>' +
+          '<div class="tool-section-label">' + escapeHtml(toolActionLabel(msg)) + "</div>" +
           '<pre class="tool-output tool-cmd">' +
           escapeHtml(msg.command) +
           "</pre>";
@@ -2763,14 +2899,9 @@
       }
 
       if (msg.stdout) {
-        var outSection = document.createElement("div");
-        outSection.className = "tool-section";
-        outSection.innerHTML =
-          '<div class="tool-section-label">标准输出</div>' +
-          '<pre class="tool-output tool-stdout">' +
-          escapeHtml(msg.stdout) +
-          "</pre>";
-        body.appendChild(outSection);
+        body.appendChild(
+          buildToolOutputSection("标准输出", msg.stdout, "tool-stdout", TOOL_STDOUT_MAX_LINES)
+        );
       }
 
       if (msg.stderr) {
@@ -2792,6 +2923,99 @@
       }
 
       return body;
+    }
+
+    function countFollowingToolMessages(index, messages) {
+      var count = 0;
+      for (var i = index + 1; i < messages.length; i++) {
+        if (messages[i].role === "tool") {
+          count++;
+        } else {
+          break;
+        }
+      }
+      return count;
+    }
+
+    function toolCallSummaryLabel(tc) {
+      var name = (tc && tc.name) || "tool";
+      var args = {};
+      try {
+        args = JSON.parse((tc && tc.arguments) || "{}");
+      } catch (_e) {
+        args = {};
+      }
+      if (name === "bash" && args.command) {
+        return "bash · " + args.command;
+      }
+      if (name === "read" && args.path) {
+        var readLabel = "read · " + args.path;
+        if (args.offset || args.limit) {
+          readLabel += " (";
+          if (args.offset) {
+            readLabel += "offset=" + args.offset;
+          }
+          if (args.limit) {
+            readLabel += (args.offset ? ", " : "") + "limit=" + args.limit;
+          }
+          readLabel += ")";
+        }
+        return readLabel;
+      }
+      if (name === "write" && args.path) {
+        return "write · " + args.path;
+      }
+      if (name === "edit" && args.path) {
+        return "edit · " + args.path;
+      }
+      if (name === "ssh" && args.remote_command) {
+        return "ssh · " + args.remote_command;
+      }
+      return name;
+    }
+
+    function buildToolCallsSummary(msg) {
+      var calls = (msg && msg.tool_calls) || [];
+      if (!calls.length) {
+        return "";
+      }
+      var items = calls.map(function (tc) {
+        return "<li>" + escapeHtml(toolCallSummaryLabel(tc)) + "</li>";
+      });
+      return (
+        '<div class="chat-tool-calls-summary">' +
+        '<div class="chat-tool-calls-label">调用 ' +
+        calls.length +
+        " 个工具</div>" +
+        '<ul class="chat-tool-calls-list">' +
+        items.join("") +
+        "</ul></div>"
+      );
+    }
+
+    function shouldShowProposalBlock(msg, index, messages) {
+      var cmd = proposedCommand(msg, index, messages);
+      if (!cmd) {
+        return false;
+      }
+      var state = proposalState(msg, index, messages);
+      if (state === "pending") {
+        return true;
+      }
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        return false;
+      }
+      if (state === "proposed") {
+        var content = (msg.content || "").trim();
+        if (content.length > 300 && !isCommandPending(cmd)) {
+          return false;
+        }
+        return true;
+      }
+      if (state === "executed" || state === "rejected") {
+        return countFollowingToolMessages(index, messages) === 0;
+      }
+      return false;
     }
 
     function buildProposalBlock(cmd, risk, state) {
@@ -2874,7 +3098,7 @@
       wrap.className = "chat-msg " + roleClass(msg.role);
       wrap.dataset.messageId = msg.id || "";
 
-      var avatar = createRoleAvatar(msg.role);
+      var avatar = createRoleAvatar(msg.role, msg);
 
       var content = document.createElement("div");
       content.className = "chat-msg-content";
@@ -2882,7 +3106,7 @@
       var meta = document.createElement("div");
       meta.className = "chat-msg-meta";
       var timeText = formatMessageTime(msg.timestamp);
-      var roleBadge = '<span class="chat-role-badge">' + escapeHtml(roleLabel(msg.role)) + "</span>";
+      var roleBadge = '<span class="chat-role-badge">' + escapeHtml(roleLabel(msg.role, msg)) + "</span>";
       if (msg.role === "tool") {
         var scopeLabel = executionScopeLabel(msg.command, msg);
         meta.innerHTML =
@@ -2927,16 +3151,17 @@
             body.appendChild(textNode);
           }
         }
+        if (msg.role === "assistant" && msg.tool_calls && msg.tool_calls.length > 0) {
+          body.insertAdjacentHTML("beforeend", buildToolCallsSummary(msg));
+        }
         if (msg.role === "assistant") {
           var cmd = proposedCommand(msg, index, messages);
-          if (cmd) {
+          if (cmd && shouldShowProposalBlock(msg, index, messages)) {
             var state = proposalState(msg, index, messages);
-            if (state !== "pending") {
-              body.insertAdjacentHTML(
-                "beforeend",
-                buildProposalBlock(cmd, msg.risk, state)
-              );
-            }
+            body.insertAdjacentHTML(
+              "beforeend",
+              buildProposalBlock(cmd, msg.risk, state)
+            );
           }
         }
       }
@@ -3180,8 +3405,13 @@
       sessionSidebar.setTitle(sessionTitleFromMessages(next.messages));
       updateSessionLink(sessionId);
       writeUrlState({ sessionId: sessionId }, urlOptions && urlOptions.replace);
-      renderMessages();
-      renderApprovals();
+      try {
+        renderMessages();
+        renderApprovals();
+      } catch (err) {
+        setError("消息渲染失败: " + (err && err.message ? err.message : String(err)));
+        throw err;
+      }
       updateComposerState();
       filesPanel.setSession(sessionId);
     }
@@ -3351,18 +3581,14 @@
             return;
           }
           var link = sessionShareUrl(id);
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(link).then(function () {
-              els.copyLink.classList.add("is-copied");
-              els.copyLink.title = "已复制链接";
-              setTimeout(function () {
-                els.copyLink.classList.remove("is-copied");
-                els.copyLink.title = "复制会话链接";
-              }, 1600);
-            });
-          } else {
-            window.prompt("复制会话链接", link);
-          }
+          copyTextToClipboard(link).then(function () {
+            els.copyLink.classList.add("is-copied");
+            els.copyLink.title = "已复制链接";
+            setTimeout(function () {
+              els.copyLink.classList.remove("is-copied");
+              els.copyLink.title = "复制会话链接";
+            }, 1600);
+          });
         });
       }
 
@@ -3395,8 +3621,9 @@
       loadConfig()
         .then(function () {
           if (bootstrapId) {
-            return loadSession(bootstrapId, { replace: true }).catch(function () {
-              return createSession(els.policy.value, { replace: true });
+            return loadSession(bootstrapId, { replace: true }).catch(function (err) {
+              setError("加载会话失败: " + (err && err.message ? err.message : String(err)));
+              throw err;
             });
           }
           return createSession(els.policy.value, { replace: true });
@@ -3728,9 +3955,33 @@
             syncStreamState();
           }
 
+          function updateStreamingStatus(label) {
+            var streamWrap = document.getElementById("chat-streaming-msg");
+            if (!streamWrap) {
+              return;
+            }
+            var thinkingLabel = streamWrap.querySelector(".chat-thinking-label");
+            if (thinkingLabel) {
+              thinkingLabel.textContent = label || "正在思考…";
+            }
+          }
+
           return consumeSSE(res.body.getReader(), function (eventName, data) {
             if (eventName === "turn_start") {
               startAssistantStream();
+              return null;
+            }
+            if (eventName === "executing") {
+              if (!textEl) {
+                textEl = appendStreamingAssistant();
+                syncStreamState();
+              }
+              var execPayload = JSON.parse(data);
+              updateStreamingStatus(
+                execPayload.command
+                  ? "正在执行：" + execPayload.command
+                  : "正在执行命令…"
+              );
               return null;
             }
             if (eventName === "session") {

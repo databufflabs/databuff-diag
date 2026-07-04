@@ -53,6 +53,16 @@ func TestLooksIncompleteAssistant(t *testing.T) {
 			text: "## 最终诊断结论\n\n" + strings.Repeat("x", 300),
 			want: false,
 		},
+		{
+			name: "research summary not incomplete",
+			text: "---\n\n## 项目调研总结\n\n" + strings.Repeat("x", 300),
+			want: false,
+		},
+		{
+			name: "promises to write script file",
+			text: "脚本内容刚才只是直接通过 shell 执行了，没有保存成文件。现在我来将脚本写入工作目录。",
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -108,5 +118,56 @@ func TestAgent_NudgesIncompleteAssistant(t *testing.T) {
 	}
 	if !sawTool {
 		t.Fatal("expected uname -r to run after nudge")
+	}
+}
+
+func TestAgent_NudgesInlineScriptTool(t *testing.T) {
+	dir := t.TempDir()
+	sessions := store.NewSessionStoreAt(filepath.Join(dir, "sessions"))
+	session, err := sessions.Create(policy.Open)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	scriptJSON := `{"tool":"shell","command":"#!/bin/bash\necho hello\n"}`
+	ag := &Agent{
+		LLM: &mockLLM{
+			responses: []string{
+				scriptJSON,
+				`{"tool":"shell","command":"echo ok"}`,
+			},
+		},
+		Policy:   &policy.Engine{},
+		Executor: exec.NewLocal(exec.LocalConfig{}),
+		Sessions: sessions,
+	}
+
+	provider := llm.MergedProvider{ProviderCode: "test", BaseURL: "http://test", Model: "m"}
+	if err := ag.HandleUserMessage(context.Background(), session, "写脚本", provider); err != nil {
+		t.Fatalf("HandleUserMessage: %v", err)
+	}
+
+	reloaded, err := sessions.Load(session.ID)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	var sawInlineNudge, sawEcho bool
+	for _, msg := range reloaded.Messages {
+		if msg.Role == "system" && msg.Content == inlineScriptNudgeMessage {
+			sawInlineNudge = true
+		}
+		if msg.Role == "tool" && msg.Command == "echo ok" {
+			sawEcho = true
+		}
+		if msg.Role == "tool" && strings.HasPrefix(msg.Command, "#!/bin/bash") {
+			t.Fatal("inline script must not be executed")
+		}
+	}
+	if !sawInlineNudge {
+		t.Fatal("expected inline script nudge system message")
+	}
+	if !sawEcho {
+		t.Fatal("expected follow-up command after nudge")
 	}
 }

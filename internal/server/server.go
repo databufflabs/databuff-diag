@@ -169,7 +169,7 @@ func ListenAndServe(addr string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	fmt.Printf("✓ databuff-diag 启动成功，访问 %s\n", ServeURL(addr))
+	PrintStartupBanner(addr)
 	srv := &http.Server{Handler: handler}
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("serve: %w", err)

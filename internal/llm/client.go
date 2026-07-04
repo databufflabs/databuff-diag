@@ -16,20 +16,26 @@ import (
 // ChatMessage is a single message in a chat request.
 // Content is a string for plain text, or []ContentPart for multimodal messages.
 type ChatMessage struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
+	Role       string             `json:"role"`
+	Content    any                `json:"content,omitempty"`
+	ToolCalls  []FunctionToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string             `json:"tool_call_id,omitempty"`
+	Name       string             `json:"name,omitempty"`
 }
 
 // ChatRequest is the OpenAI-shaped chat completion payload.
 type ChatRequest struct {
-	Model    string        `json:"model"`
-	Messages []ChatMessage `json:"messages"`
-	Stream   bool          `json:"stream"`
+	Model       string           `json:"model"`
+	Messages    []ChatMessage    `json:"messages"`
+	Stream      bool             `json:"stream"`
+	Tools       []ToolDefinition `json:"tools,omitempty"`
+	ToolChoice  any              `json:"tool_choice,omitempty"`
 }
 
 // ChatResponse is the extracted assistant reply from a chat call.
 type ChatResponse struct {
-	Content string
+	Content   string
+	ToolCalls []FunctionToolCall
 }
 
 // Client sends chat requests to configured LLM providers.
@@ -103,16 +109,31 @@ func (c *Client) Chat(ctx context.Context, provider MergedProvider, req ChatRequ
 		return nil, fmt.Errorf("chat request failed: status %d %s", resp.StatusCode, string(body))
 	}
 
-	proc, err := ProcessorFor(provider)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := proc.Extract(body)
+	completion, err := ExtractCompletion(provider, body)
 	if err != nil {
 		return nil, fmt.Errorf("extract response: %w", err)
 	}
-	return &ChatResponse{Content: content}, nil
+	return &ChatResponse{Content: completion.Content, ToolCalls: completion.ToolCalls}, nil
+}
+
+// ExtractCompletion parses a chat completion body with the provider's processor.
+func ExtractCompletion(provider MergedProvider, body []byte) (ChatCompletion, error) {
+	proc, err := ProcessorFor(provider)
+	if err != nil {
+		return ChatCompletion{}, err
+	}
+	if cp, ok := proc.(processor.CompletionProcessor); ok {
+		c, err := cp.ExtractCompletion(body)
+		if err != nil {
+			return ChatCompletion{}, err
+		}
+		return completionFromProcessor(c), nil
+	}
+	content, err := proc.Extract(body)
+	if err != nil {
+		return ChatCompletion{}, err
+	}
+	return ChatCompletion{Content: content}, nil
 }
 
 // ExtractResponse parses an HTTP response body with the provider's processor.

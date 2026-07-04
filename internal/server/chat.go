@@ -130,6 +130,14 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if repaired := llm.RepairToolCallSequences(session.Messages); len(repaired) != len(session.Messages) {
+		session.Messages = repaired
+		if err := h.SessionStore.Save(session); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
 	message := strings.TrimSpace(req.Message)
 	sshresolve.ApplyMessageOverrides(session, message)
 	if len(session.SSHOverrides) > 0 {
@@ -178,6 +186,9 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		},
 		OnChunk: func(content string) error {
 			return writeSSE("chunk", map[string]string{"content": content})
+		},
+		OnBeforeExecute: func(command string) error {
+			return writeSSE("executing", map[string]string{"command": command})
 		},
 		AfterResolve: func(_ *store.Session) error {
 			reloaded, err := h.SessionStore.Load(sessionID)

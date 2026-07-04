@@ -20,12 +20,60 @@ type ImageURL struct {
 	URL string `json:"url"`
 }
 
+const interruptedToolResult = "Error: tool execution was interrupted before completion."
+
+// RepairToolCallSequences inserts synthetic tool results when an assistant turn
+// with tool_calls was not fully answered (e.g. client disconnect or a new user
+// message arrived mid-batch). OpenAI-compatible APIs reject such histories.
+func RepairToolCallSequences(messages []store.SessionMessage) []store.SessionMessage {
+	if len(messages) == 0 {
+		return messages
+	}
+	out := make([]store.SessionMessage, 0, len(messages)+4)
+	for i := 0; i < len(messages); i++ {
+		msg := messages[i]
+		out = append(out, msg)
+		if msg.Role != "assistant" || len(msg.ToolCalls) == 0 {
+			continue
+		}
+		expected := make(map[string]store.StoredToolCall, len(msg.ToolCalls))
+		order := make([]string, 0, len(msg.ToolCalls))
+		for _, tc := range msg.ToolCalls {
+			expected[tc.ID] = tc
+			order = append(order, tc.ID)
+		}
+		i++
+		responded := make(map[string]bool, len(order))
+		for i < len(messages) && messages[i].Role == "tool" {
+			out = append(out, messages[i])
+			if id := messages[i].ToolCallID; id != "" {
+				responded[id] = true
+			}
+			i++
+		}
+		for _, id := range order {
+			if responded[id] {
+				continue
+			}
+			tc := expected[id]
+			out = append(out, store.SessionMessage{
+				Role:       "tool",
+				Content:    interruptedToolResult,
+				ToolCallID: id,
+				ToolName:   tc.Name,
+			})
+		}
+		i--
+	}
+	return out
+}
+
 // BuildMessagesFromSession converts stored session messages to LLM chat messages.
 // When vision is false, image attachments are replaced with text placeholders so
 // text-only providers (e.g. DeepSeek) do not receive image_url content parts.
 func BuildMessagesFromSession(session *store.Session, systemPrompt string, attachments *store.AttachmentStore, vision bool) ([]ChatMessage, error) {
 	out := []ChatMessage{{Role: "system", Content: systemPrompt}}
-	for _, msg := range session.Messages {
+	for _, msg := range RepairToolCallSequences(session.Messages) {
 		chatMsg, err := MessageFromSession(msg, attachments, vision)
 		if err != nil {
 			return nil, err
@@ -38,7 +86,26 @@ func BuildMessagesFromSession(session *store.Session, systemPrompt string, attac
 func MessageFromSession(msg store.SessionMessage, attachments *store.AttachmentStore, vision bool) (ChatMessage, error) {
 	role := msg.Role
 	if role == "tool" {
-		role = "user"
+		chat := ChatMessage{
+			Role:       "tool",
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+			Name:       msg.ToolName,
+		}
+		if chat.ToolCallID == "" {
+			chat.Role = "user"
+			chat.Content = "[tool result]\n" + msg.Content
+		}
+		return chat, nil
+	}
+
+	if role == "assistant" && len(msg.ToolCalls) > 0 {
+		calls := make([]FunctionToolCall, len(msg.ToolCalls))
+		for i, tc := range msg.ToolCalls {
+			calls[i] = NewFunctionToolCall(tc.ID, tc.Name, tc.Arguments)
+		}
+		content := msg.Content
+		return ChatMessage{Role: "assistant", Content: content, ToolCalls: calls}, nil
 	}
 
 	if len(msg.Attachments) == 0 || attachments == nil {

@@ -100,7 +100,7 @@ checks:
 	}
 
 	ctx := loader.SystemPromptContext()
-	if !contains(ctx, "generic-infra") || !contains(ctx, "docker ps") {
+	if !contains(ctx, "generic-infra") || !contains(ctx, "<available_skills>") || !contains(ctx, "SKILL.md") {
 		t.Fatalf("system context missing skill data: %q", ctx)
 	}
 
@@ -144,7 +144,7 @@ func TestLoader_LoadRepoGenericInfra(t *testing.T) {
 	}
 
 	ctx := loader.SystemPromptContext()
-	for _, needle := range []string{"generic-infra", "docker ps", "kubectl get pods", "df -h", "free -m"} {
+	for _, needle := range []string{"generic-infra", "<available_skills>", "SKILL.md", "docker-health"} {
 		if !contains(ctx, needle) {
 			t.Fatalf("system context missing %q", needle)
 		}
@@ -190,11 +190,9 @@ func TestLoader_LoadRepoDatabuffOSS(t *testing.T) {
 	ctx := loader.SystemPromptContext()
 	for _, needle := range []string{
 		"databuff-oss",
-		"ai-apm-install",
-		"doris-fe",
-		"4318/health",
-		"27403/health",
-		"docker compose -f /opt/databuff-ai-apm/docker-compose.yml logs",
+		"<available_skills>",
+		"SKILL.md",
+		"ai-apm-install-failure",
 	} {
 		if !contains(ctx, needle) {
 			t.Fatalf("system context missing %q", needle)

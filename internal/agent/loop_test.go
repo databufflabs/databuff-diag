@@ -284,7 +284,7 @@ description: infra checks
 		t.Fatal("expected LLM call")
 	}
 	sys, _ := captured[0].Content.(string)
-	if !strings.Contains(sys, "generic-infra") || !strings.Contains(sys, "Generic infra guidance") {
+	if !strings.Contains(sys, "generic-infra") || !strings.Contains(sys, "<available_skills>") || !strings.Contains(sys, "SKILL.md") {
 		t.Fatalf("system prompt missing skill context: %q", sys)
 	}
 }

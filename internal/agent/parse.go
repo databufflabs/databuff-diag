@@ -10,9 +10,13 @@ import (
 )
 
 var (
-	bashFenceRE       = regexp.MustCompile("(?s)```(?:json|bash|sh|shell)?\\s*\\n([^`]+)```")
-	jsonToolRE        = regexp.MustCompile(`(?s)\{\s*"tool"\s*:\s*"shell"\s*,\s*"command"\s*:\s*"([^"]+)"\s*\}`)
-	shellToolRE       = regexp.MustCompile(`\{\s*"tool"\s*:\s*"shell"`)
+	bashFenceRE         = regexp.MustCompile("(?s)```(?:json|bash|sh|shell)?\\s*\\n([^`]+)```")
+	executableFenceRE   = regexp.MustCompile("(?s)```(json|bash|sh|shell)\\s*\\n([^`]+)```")
+	jsonToolRE          = regexp.MustCompile(`(?s)\{\s*"tool"\s*:\s*"(?:shell|bash)"\s*,\s*"command"\s*:\s*"([^"]+)"\s*\}`)
+	jsonReadToolRE      = regexp.MustCompile(`"tool"\s*:\s*"read"`)
+	jsonWriteToolRE     = regexp.MustCompile(`"tool"\s*:\s*"write"`)
+	jsonEditToolRE      = regexp.MustCompile(`"tool"\s*:\s*"edit"`)
+	shellToolRE       = regexp.MustCompile(`\{\s*"tool"\s*:\s*"(?:shell|bash)"`)
 	sshToolRE         = regexp.MustCompile(`\{\s*"tool"\s*:\s*"ssh"`)
 	fenceOpenerRE     = regexp.MustCompile("(?s)\\n?```(?:json|bash|sh|shell)?\\s*\\n?\\s*$")
 	orphanFenceLineRE = regexp.MustCompile("(?m)^```(?:json|bash|sh|shell)?\\s*$")
@@ -39,7 +43,7 @@ type sshToolJSON struct {
 // keeping intro text before the command block and dropping fabricated output that
 // may follow the proposed command.
 func ProposalText(full, cmd string) string {
-	return ProposalTextForTool(full, ToolCall{Kind: ToolShell, ShellCommand: cmd, DisplayCommand: cmd})
+	return ProposalTextForTool(full, ToolCall{Kind: ToolBash, ShellCommand: cmd, DisplayCommand: cmd})
 }
 
 // ProposalTextForTool returns the assistant portion to persist for a tool-proposal turn.
@@ -111,13 +115,13 @@ func sanitizeProposalContent(s string) string {
 // Bare identifier lists (e.g. container names) are rejected — only plausible shell commands pass.
 func ParseCommand(text string) (string, bool) {
 	tool, ok := ParseTool(text)
-	if !ok || tool.Kind != ToolShell {
+	if !ok || tool.Kind != ToolBash {
 		return "", false
 	}
 	return tool.ShellCommand, true
 }
 
-// ParseTool extracts a shell or SSH tool call from assistant text.
+// ParseTool extracts a tool call from assistant text (JSON fallback when native tool calling is unavailable).
 func ParseTool(text string) (ToolCall, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -127,32 +131,57 @@ func ParseTool(text string) (ToolCall, bool) {
 	if tool, ok := parseJSONSSHTool(text); ok {
 		return tool, true
 	}
-	if cmd, ok := parseJSONTool(text); ok && looksLikeShellCommand(cmd) {
+	if tool, ok := parseJSONReadTool(text); ok {
+		return tool, true
+	}
+	if tool, ok := parseJSONWriteTool(text); ok {
+		return tool, true
+	}
+	if tool, ok := parseJSONEditTool(text); ok {
+		return tool, true
+	}
+	if cmd, ok := parseJSONTool(text); ok && looksLikeShellCommand(cmd) && !isInlineScriptBody(cmd) {
 		return ToolCall{
-			Kind:           ToolShell,
+			Kind:           ToolBash,
 			ShellCommand:   cmd,
 			DisplayCommand: cmd,
 		}, true
 	}
 
-	if matches := bashFenceRE.FindStringSubmatch(text); len(matches) == 2 {
-		fenced := strings.TrimSpace(matches[1])
+	if matches := executableFenceRE.FindStringSubmatch(text); len(matches) == 3 {
+		fenced := strings.TrimSpace(matches[2])
 		if tool, ok := parseJSONSSHTool(fenced); ok {
 			return tool, true
 		}
-		if looksLikeShellCommand(fenced) {
+		if tool, ok := parseJSONReadTool(fenced); ok {
+			return tool, true
+		}
+		if tool, ok := parseJSONWriteTool(fenced); ok {
+			return tool, true
+		}
+		if tool, ok := parseJSONEditTool(fenced); ok {
+			return tool, true
+		}
+		if cmd, ok := parseJSONTool(fenced); ok && looksLikeShellCommand(cmd) && !isInlineScriptBody(cmd) {
 			return ToolCall{
-				Kind:           ToolShell,
+				Kind:           ToolBash,
+				ShellCommand:   cmd,
+				DisplayCommand: cmd,
+			}, true
+		}
+		lang := strings.ToLower(strings.TrimSpace(matches[1]))
+		if lang != "json" && looksLikeShellCommand(fenced) && !isInlineScriptBody(fenced) && !isNonShellFencedContent(fenced) {
+			return ToolCall{
+				Kind:           ToolBash,
 				ShellCommand:   fenced,
 				DisplayCommand: fenced,
 			}, true
 		}
 	}
 
-	// Single-line bare shell command when the whole message is clearly a command line.
 	if isBareShellLine(text) {
 		return ToolCall{
-			Kind:           ToolShell,
+			Kind:           ToolBash,
 			ShellCommand:   text,
 			DisplayCommand: text,
 		}, true
@@ -248,8 +277,10 @@ func parseJSONTool(text string) (string, bool) {
 			}
 			continue
 		}
-		if tool.Tool == "shell" && strings.TrimSpace(tool.Command) != "" {
-			return strings.TrimSpace(tool.Command), true
+		if tool.Tool == "shell" || tool.Tool == "bash" {
+			if strings.TrimSpace(tool.Command) != "" {
+				return strings.TrimSpace(tool.Command), true
+			}
 		}
 	}
 	return "", false
@@ -266,6 +297,70 @@ var knownCommands = map[string]struct{}{
 	"ss": {}, "stat": {}, "systemctl": {}, "tail": {}, "tee": {}, "test": {}, "top": {},
 	"traceroute": {}, "true": {}, "uname": {}, "uniq": {}, "uptime": {}, "wc": {},
 	"which": {}, "whoami": {}, "xargs": {},
+}
+
+// isInlineScriptBody reports a full script meant to be saved as a file, not executed inline.
+func isInlineScriptBody(cmd string) bool {
+	return strings.HasPrefix(strings.TrimSpace(cmd), "#!")
+}
+
+// LooksInlineScriptTool reports assistant text that tries to run a shebang script as a shell command.
+func LooksInlineScriptTool(text string) bool {
+	if cmd, ok := parseJSONTool(text); ok && isInlineScriptBody(cmd) {
+		return true
+	}
+	if matches := bashFenceRE.FindStringSubmatch(text); len(matches) == 2 {
+		return isInlineScriptBody(strings.TrimSpace(matches[1]))
+	}
+	return false
+}
+
+// looksLikeEmbeddedToolProposal reports assistant text that intentionally embeds a tool call.
+func looksLikeEmbeddedToolProposal(text string) bool {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return false
+	}
+	if shellToolRE.MatchString(text) || sshToolRE.MatchString(text) {
+		return true
+	}
+	if strings.Contains(text, `"tool"`) {
+		for _, re := range []*regexp.Regexp{jsonReadToolRE, jsonWriteToolRE, jsonEditToolRE} {
+			if re.MatchString(text) {
+				return true
+			}
+		}
+	}
+	if executableFenceRE.MatchString(text) {
+		return true
+	}
+	return isBareShellLine(text)
+}
+
+func isNonShellFencedContent(s string) bool {
+	if strings.ContainsAny(s, "├└│") {
+		return true
+	}
+	lines := strings.Split(s, "\n")
+	nonEmpty := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmpty++
+		}
+	}
+	if nonEmpty <= 1 {
+		return false
+	}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if looksLikeShellCommand(line) {
+			return false
+		}
+	}
+	return true
 }
 
 func looksLikeShellCommand(cmd string) bool {
@@ -335,4 +430,93 @@ func extractJSONObject(s string) string {
 		}
 	}
 	return ""
+}
+
+type readToolJSON struct {
+	Tool   string `json:"tool"`
+	Path   string `json:"path"`
+	Offset int    `json:"offset"`
+	Limit  int    `json:"limit"`
+}
+
+type writeToolJSON struct {
+	Tool    string `json:"tool"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type editToolJSON struct {
+	Tool  string     `json:"tool"`
+	Path  string     `json:"path"`
+	Edits []TextEdit `json:"edits"`
+}
+
+func parseJSONReadTool(text string) (ToolCall, bool) {
+	return parseGenericJSONTool(text, "read", func(raw string) (ToolCall, bool) {
+		var tool readToolJSON
+		if err := json.Unmarshal([]byte(raw), &tool); err != nil || tool.Tool != ToolRead {
+			return ToolCall{}, false
+		}
+		path := strings.TrimSpace(tool.Path)
+		if path == "" {
+			return ToolCall{}, false
+		}
+		tc := ToolCall{Kind: ToolRead, ReadPath: path, ReadOffset: tool.Offset, ReadLimit: tool.Limit}
+		tc.DisplayCommand = displayForTool(tc)
+		return tc, true
+	})
+}
+
+func parseJSONWriteTool(text string) (ToolCall, bool) {
+	return parseGenericJSONTool(text, "write", func(raw string) (ToolCall, bool) {
+		var tool writeToolJSON
+		if err := json.Unmarshal([]byte(raw), &tool); err != nil || tool.Tool != ToolWrite {
+			return ToolCall{}, false
+		}
+		path := strings.TrimSpace(tool.Path)
+		if path == "" {
+			return ToolCall{}, false
+		}
+		tc := ToolCall{Kind: ToolWrite, WritePath: path, WriteContent: tool.Content}
+		tc.DisplayCommand = displayForTool(tc)
+		return tc, true
+	})
+}
+
+func parseJSONEditTool(text string) (ToolCall, bool) {
+	return parseGenericJSONTool(text, "edit", func(raw string) (ToolCall, bool) {
+		var tool editToolJSON
+		if err := json.Unmarshal([]byte(raw), &tool); err != nil || tool.Tool != ToolEdit {
+			return ToolCall{}, false
+		}
+		path := strings.TrimSpace(tool.Path)
+		if path == "" || len(tool.Edits) == 0 {
+			return ToolCall{}, false
+		}
+		tc := ToolCall{Kind: ToolEdit, EditPath: path, Edits: tool.Edits}
+		tc.DisplayCommand = displayForTool(tc)
+		return tc, true
+	})
+}
+
+func parseGenericJSONTool(text, toolName string, parse func(string) (ToolCall, bool)) (ToolCall, bool) {
+	candidates := []string{text}
+	if matches := bashFenceRE.FindStringSubmatch(text); len(matches) == 2 {
+		candidates = append([]string{strings.TrimSpace(matches[1])}, candidates...)
+	}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if !strings.Contains(candidate, `"tool"`) || !strings.Contains(candidate, toolName) {
+			continue
+		}
+		if tc, ok := parse(candidate); ok {
+			return tc, true
+		}
+		if frag := extractJSONObject(candidate); frag != "" {
+			if tc, ok := parse(frag); ok {
+				return tc, true
+			}
+		}
+	}
+	return ToolCall{}, false
 }

@@ -15,35 +15,7 @@ import (
 	"github.com/databufflabs/databuff-diag/internal/store"
 )
 
-const maxReactIterations = 8
-
-const systemPrompt = `You are databuff-diag, a site reliability assistant that helps diagnose deployment and infrastructure issues on the host machine.
-
-When you need to run a command on the local machine, propose exactly one JSON tool block:
-{"tool":"shell","command":"your full command here"}
-
-When you need to run a command on a remote host via SSH, propose exactly one JSON tool block:
-{"tool":"ssh","host_id":"host-xxx","command":"remote command here"}
-or
-{"tool":"ssh","host":"192.168.1.10","user":"root","command":"remote command here"}
-
-Saved SSH hosts have passwords injected by the system. Never include passwords in tool calls for saved hosts.
-Do not use sshpass or embed passwords in shell commands. Use {"tool":"ssh",...} for all remote inspection.
-Do not run a local substitute command when the user asked to inspect a remote host.
-
-Do not wrap JSON tool blocks in markdown code fences.
-
-Use complete shell commands (e.g. "docker inspect ai-apm-demo", "docker ps -a"). Never put bare container names, hostnames, or identifiers in code blocks as if they were commands.
-
-Only propose commands you actually need. After command output is provided, analyze it and either propose another command or give your final answer.
-
-Do not invent command output. Wait for real execution results before claiming what a command returned.
-
-Non-interactive execution: never use -it or -t with docker exec; use docker exec <container> sh -c "command" instead.
-
-When you intend to run a command, you MUST include the tool JSON in the same response. Never end with only a transitional sentence (e.g. "接下来查看…：" or "let me check…") without the tool block. Either propose the command or deliver your full analysis.
-
-Each conversation has an isolated session workspace directory. All files you create during this session (reports, scripts, notes, exported data, etc.) must be written only under that directory. Prefer absolute paths rooted at the session workspace in shell commands. Do not write session artifacts to /tmp or other locations outside the workspace unless the user explicitly asks.`
+const maxReactIterations = 1000
 
 // LoopCallbacks hooks optional streaming progress during approve / agent loop.
 type LoopCallbacks struct {
@@ -150,7 +122,7 @@ func (a *Agent) ApproveWithCallbacks(ctx context.Context, session *store.Session
 	}
 
 	if !approved {
-		if err := a.rejectAndObserve(session, toolCall.DisplayCommand); err != nil {
+		if err := a.rejectAndObserve(session, toolCall); err != nil {
 			return err
 		}
 	} else {
@@ -183,6 +155,8 @@ func (a *Agent) RunLoopStream(ctx context.Context, session *store.Session, provi
 }
 
 func (a *Agent) runLoopWithCallbacks(ctx context.Context, session *store.Session, provider llm.MergedProvider, cb *LoopCallbacks) error {
+	_ = a.maybeCompactSession(ctx, session, provider)
+
 	for i := 0; i < maxReactIterations; i++ {
 		if len(session.PendingApprovals) > 0 {
 			return a.Sessions.Save(session)
@@ -203,13 +177,15 @@ func (a *Agent) runLoopWithCallbacks(ctx context.Context, session *store.Session
 		if cb != nil {
 			onChunk = cb.OnChunk
 		}
-		assistantText, err := a.completeAssistant(ctx, provider, messages, onChunk)
+		assistantText, llmCalls, err := a.completeAssistant(ctx, provider, messages, onChunk)
 		if err != nil {
 			return fmt.Errorf("llm chat: %w", err)
 		}
 
 		assistantText = strings.TrimSpace(assistantText)
-		if assistantText == "" {
+		toolCalls, hasTools := ToolCallsFromCompletion(assistantText, llmCalls)
+
+		if assistantText == "" && !hasTools {
 			if err := a.Sessions.AppendMessage(session, store.SessionMessage{
 				Role:    "system",
 				Content: emptyResponseNudgeMessage,
@@ -218,64 +194,117 @@ func (a *Agent) runLoopWithCallbacks(ctx context.Context, session *store.Session
 			}
 			continue
 		}
-		toolCall, ok := ParseTool(assistantText)
+
+		if hasTools {
+			assistantMsg := a.buildAssistantToolMessage(assistantText, toolCalls, llmCalls)
+			if err := a.Sessions.AppendMessage(session, assistantMsg); err != nil {
+				return err
+			}
+			if err := a.emitProgress(cb, session); err != nil {
+				return err
+			}
+			for _, toolCall := range toolCalls {
+				tc := toolCall
+				if err := a.finalizeToolCall(session, &tc); err != nil {
+					if appendErr := a.Sessions.AppendMessage(session, store.SessionMessage{
+						Role:    "system",
+						Content: fmt.Sprintf("工具解析失败：%v", err),
+					}); appendErr != nil {
+						return appendErr
+					}
+					if err := a.emitProgress(cb, session); err != nil {
+						return err
+					}
+					continue
+				}
+				if err := a.maybeEmitBeforeExecute(cb, session, tc); err != nil {
+					return err
+				}
+				if err := a.HandleProposedTool(ctx, session, tc); err != nil {
+					return err
+				}
+				if err := a.emitProgress(cb, session); err != nil {
+					return err
+				}
+				if len(session.PendingApprovals) > 0 {
+					return nil
+				}
+			}
+			continue
+		}
+
 		assistantMsg := store.SessionMessage{
 			Role:    "assistant",
 			Content: assistantText,
-		}
-		if ok {
-			if err := a.finalizeToolCall(session, &toolCall); err != nil {
-				if appendErr := a.Sessions.AppendMessage(session, store.SessionMessage{
-					Role:    "system",
-					Content: fmt.Sprintf("SSH 工具解析失败：%v", err),
-				}); appendErr != nil {
-					return appendErr
-				}
-				continue
-			}
-			assistantMsg.Content = ProposalTextForTool(assistantText, toolCall)
-			assistantMsg.Command = toolCall.DisplayCommand
-			if risk, classifyErr := a.policy().Classify(toolCall.PolicyCommand()); classifyErr == nil {
-				assistantMsg.Risk = string(risk)
-			}
 		}
 		if err := a.Sessions.AppendMessage(session, assistantMsg); err != nil {
 			return err
 		}
 
-		if !ok {
-			if looksMalformedToolJSON(assistantText) {
-				if err := a.Sessions.AppendMessage(session, store.SessionMessage{
-					Role:    "system",
-					Content: "tool JSON 格式无效或混入多余 shell 片段。请只输出一行合法 JSON，例如 {\"tool\":\"shell\",\"command\":\"docker ps -a\"}，不要把 2>/dev/null 等重定向写在 JSON 外面。",
-				}); err != nil {
-					return err
-				}
-				continue
+		if LooksInlineScriptTool(assistantText) {
+			if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+				Role:    "system",
+				Content: inlineScriptNudgeMessage,
+			}); err != nil {
+				return err
 			}
-			if looksIncompleteAssistant(assistantText) {
-				if err := a.Sessions.AppendMessage(session, store.SessionMessage{
-					Role:    "system",
-					Content: incompleteNudgeMessage,
-				}); err != nil {
-					return err
-				}
-				continue
+			continue
+		}
+		if looksMalformedToolJSON(assistantText) {
+			if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+				Role:    "system",
+				Content: "工具调用格式无效。请使用 function calling（read/write/edit/bash/ssh）或输出合法 tool JSON。",
+			}); err != nil {
+				return err
 			}
-			return nil
+			continue
 		}
-
-		if err := a.HandleProposedTool(ctx, session, toolCall); err != nil {
-			return err
+		if looksIncompleteAssistant(assistantText) {
+			if err := a.Sessions.AppendMessage(session, store.SessionMessage{
+				Role:    "system",
+				Content: incompleteNudgeMessage,
+			}); err != nil {
+				return err
+			}
+			continue
 		}
-		if len(session.PendingApprovals) > 0 {
-			return nil
-		}
+		return nil
 	}
 	return nil
 }
 
+func (a *Agent) buildAssistantToolMessage(text string, toolCalls []ToolCall, llmCalls []llm.FunctionToolCall) store.SessionMessage {
+	msg := store.SessionMessage{Role: "assistant", Content: text}
+	if len(llmCalls) > 0 {
+		stored := make([]store.StoredToolCall, len(llmCalls))
+		for i, c := range llmCalls {
+			id := c.ID
+			if id == "" {
+				id = newApprovalID()
+			}
+			stored[i] = store.StoredToolCall{ID: id, Name: c.Function.Name, Arguments: c.Function.Arguments}
+		}
+		msg.ToolCalls = stored
+	}
+	if len(toolCalls) > 0 {
+		tc := toolCalls[0]
+		msg.Command = tc.DisplayCommand
+		if text == "" {
+			msg.Content = ProposalTextForTool("", tc)
+		} else {
+			msg.Content = ProposalTextForTool(text, tc)
+		}
+		if risk, err := a.policy().Classify(tc.PolicyCommand()); err == nil {
+			msg.Risk = string(risk)
+		}
+	}
+	return msg
+}
+
 func (a *Agent) finalizeToolCall(session *store.Session, toolCall *ToolCall) error {
+	if toolCall.DisplayCommand == "" {
+		toolCall.DisplayCommand = displayForTool(*toolCall)
+	}
 	if toolCall.Kind != ToolSSH || toolCall.SSHTool == nil {
 		return nil
 	}
@@ -301,31 +330,67 @@ func (a *Agent) resolveSSH(session *store.Session, spec *SSHToolCall) (sshresolv
 	}, cfg, session)
 }
 
-func (a *Agent) completeAssistant(ctx context.Context, provider llm.MergedProvider, messages []llm.ChatMessage, onChunk func(string) error) (string, error) {
+func (a *Agent) emitProgress(cb *LoopCallbacks, session *store.Session) error {
+	if cb == nil || cb.AfterResolve == nil {
+		return nil
+	}
+	return cb.AfterResolve(session)
+}
+
+func (a *Agent) maybeEmitBeforeExecute(cb *LoopCallbacks, session *store.Session, toolCall ToolCall) error {
+	if cb == nil || cb.OnBeforeExecute == nil {
+		return nil
+	}
+	risk, err := a.policy().Classify(toolCall.PolicyCommand())
+	if err != nil || risk == policy.RiskBlocked {
+		return nil
+	}
+	if policy.NeedsApproval(risk, session.PolicyMode) {
+		return nil
+	}
+	cmd := toolCall.DisplayCommand
+	if cmd == "" {
+		cmd = displayForTool(toolCall)
+	}
+	return cb.OnBeforeExecute(cmd)
+}
+
+func (a *Agent) completeAssistant(ctx context.Context, provider llm.MergedProvider, messages []llm.ChatMessage, onChunk func(string) error) (string, []llm.FunctionToolCall, error) {
+	req := llm.ChatRequest{
+		Messages:   messages,
+		Tools:      llm.AgentTools(),
+		ToolChoice: "auto",
+	}
+
 	if onChunk != nil {
 		if streamer, ok := a.LLM.(streamChatClient); ok {
 			var full strings.Builder
-			err := streamer.ChatStream(ctx, provider, llm.ChatRequest{Messages: messages}, func(chunk llm.StreamChunk) error {
+			var toolCalls []llm.FunctionToolCall
+			err := streamer.ChatStream(ctx, provider, req, func(chunk llm.StreamChunk) error {
 				if chunk.Done {
+					toolCalls = chunk.ToolCalls
 					return nil
 				}
-				full.WriteString(chunk.Content)
-				return onChunk(chunk.Content)
+				if chunk.Content != "" {
+					full.WriteString(chunk.Content)
+					return onChunk(chunk.Content)
+				}
+				return nil
 			})
-			return full.String(), err
+			return full.String(), toolCalls, err
 		}
 	}
 
-	resp, err := a.LLM.Chat(ctx, provider, llm.ChatRequest{Messages: messages})
+	resp, err := a.LLM.Chat(ctx, provider, req)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if onChunk != nil && resp.Content != "" {
 		if err := onChunk(resp.Content); err != nil {
-			return "", err
+			return "", nil, err
 		}
 	}
-	return resp.Content, nil
+	return resp.Content, resp.ToolCalls, nil
 }
 
 // HandleProposedTool classifies a tool call, queues approval, or executes it.
@@ -339,7 +404,7 @@ func (a *Agent) HandleProposedTool(ctx context.Context, session *store.Session, 
 	if risk == policy.RiskBlocked {
 		return a.Sessions.AppendMessage(session, store.SessionMessage{
 			Role:    "system",
-			Content: fmt.Sprintf("策略已拦截该命令：%s", toolCall.DisplayCommand),
+			Content: fmt.Sprintf("策略已拦截该操作：%s", toolCall.DisplayCommand),
 			Command: toolCall.DisplayCommand,
 			Risk:    string(risk),
 		})
@@ -357,32 +422,88 @@ func (a *Agent) executeToolAndObserve(ctx context.Context, session *store.Sessio
 	policyCmd := toolCall.PolicyCommand()
 	risk, _ := a.policy().Classify(policyCmd)
 	displayCmd := toolCall.DisplayCommand
-
-	var result *exec.Result
-	var err error
-	if toolCall.Kind == ToolSSH && toolCall.SSHTool != nil {
-		result, err = a.executeSSH(ctx, session, toolCall.SSHTool)
-	} else {
-		result, err = a.executor().Run(ctx, toolCall.ShellCommand)
-	}
-	if err != nil {
-		return fmt.Errorf("execute command: %w", err)
+	if displayCmd == "" {
+		displayCmd = displayForTool(toolCall)
 	}
 
-	exitCode := result.ExitCode
-	observation := formatObservation(displayCmd, result)
-	if err := a.Sessions.AppendMessage(session, store.SessionMessage{
-		Role:     "tool",
-		Content:  observation,
-		Command:  displayCmd,
-		Stdout:   result.Stdout,
-		Stderr:   result.Stderr,
-		ExitCode: &exitCode,
-		Risk:     string(risk),
-	}); err != nil {
-		return err
+	workspace := ""
+	if a.Sessions != nil && session != nil {
+		workspace = a.Sessions.WorkspaceDir(session.ID)
 	}
-	return nil
+
+	var observation string
+	var stdout, stderr string
+	var exitCode *int
+
+	switch toolCall.Kind {
+	case ToolRead:
+		text, err := readWorkspaceFile(workspace, toolCall.ReadPath, toolCall.ReadOffset, toolCall.ReadLimit)
+		observation = formatTextToolObservation(displayCmd, text, err)
+		if err == nil {
+			stdout = text
+			code := 0
+			exitCode = &code
+		} else {
+			stderr = err.Error()
+			code := 1
+			exitCode = &code
+		}
+	case ToolWrite:
+		err := writeWorkspaceFile(workspace, toolCall.WritePath, toolCall.WriteContent)
+		msg := fmt.Sprintf("Successfully wrote %s (%d bytes)", toolCall.WritePath, len(toolCall.WriteContent))
+		observation = formatTextToolObservation(displayCmd, msg, err)
+		code := 0
+		if err != nil {
+			stderr = err.Error()
+			code = 1
+		} else {
+			stdout = msg
+		}
+		exitCode = &code
+	case ToolEdit:
+		msg, err := editWorkspaceFile(workspace, toolCall.EditPath, toolCall.Edits)
+		observation = formatTextToolObservation(displayCmd, msg, err)
+		code := 0
+		if err != nil {
+			stderr = err.Error()
+			code = 1
+		} else {
+			stdout = msg
+		}
+		exitCode = &code
+	case ToolSSH:
+		result, err := a.executeSSH(ctx, session, toolCall.SSHTool)
+		if err != nil {
+			return fmt.Errorf("execute ssh: %w", err)
+		}
+		code := result.ExitCode
+		exitCode = &code
+		stdout = result.Stdout
+		stderr = result.Stderr
+		observation = formatObservation(displayCmd, result)
+	default:
+		result, err := a.executor().Run(ctx, toolCall.ShellCommand)
+		if err != nil {
+			return fmt.Errorf("execute command: %w", err)
+		}
+		code := result.ExitCode
+		exitCode = &code
+		stdout = result.Stdout
+		stderr = result.Stderr
+		observation = formatObservation(displayCmd, result)
+	}
+
+	return a.Sessions.AppendMessage(session, store.SessionMessage{
+		Role:       "tool",
+		Content:    observation,
+		Command:    displayCmd,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		ExitCode:   exitCode,
+		Risk:       string(risk),
+		ToolCallID: toolCall.ID,
+		ToolName:   toolCall.Kind,
+	})
 }
 
 func (a *Agent) executeSSH(ctx context.Context, session *store.Session, spec *SSHToolCall) (*exec.Result, error) {
@@ -399,18 +520,17 @@ func (a *Agent) executeSSH(ctx context.Context, session *store.Session, spec *SS
 	return runner.Run(ctx, spec.RemoteCommand)
 }
 
-func (a *Agent) rejectAndObserve(session *store.Session, cmd string) error {
-	risk, _ := a.policy().Classify(cmd)
-	observation := formatRejectionObservation(cmd)
-	if err := a.Sessions.AppendMessage(session, store.SessionMessage{
-		Role:    "tool",
-		Content: observation,
-		Command: cmd,
-		Risk:    string(risk),
-	}); err != nil {
-		return err
-	}
-	return nil
+func (a *Agent) rejectAndObserve(session *store.Session, toolCall ToolCall) error {
+	risk, _ := a.policy().Classify(toolCall.PolicyCommand())
+	observation := formatRejectionObservation(toolCall.DisplayCommand)
+	return a.Sessions.AppendMessage(session, store.SessionMessage{
+		Role:       "tool",
+		Content:    observation,
+		Command:    toolCall.DisplayCommand,
+		Risk:       string(risk),
+		ToolCallID: toolCall.ID,
+		ToolName:   toolCall.Kind,
+	})
 }
 
 func formatRejectionObservation(cmd string) string {
@@ -418,6 +538,20 @@ func formatRejectionObservation(cmd string) string {
 	fmt.Fprintf(&b, "Command: %s\n", cmd)
 	b.WriteString("Status: rejected by user\n")
 	b.WriteString("Message: 用户拒绝执行该命令。请勿重试该命令，改用文字说明或提出其他方案。")
+	return strings.TrimSpace(b.String())
+}
+
+func formatTextToolObservation(cmd, output string, err error) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Tool: %s\n", cmd)
+	if err != nil {
+		fmt.Fprintf(&b, "Exit code: 1\nStderr:\n%s\n", err.Error())
+	} else {
+		b.WriteString("Exit code: 0\n")
+		if output != "" {
+			fmt.Fprintf(&b, "Output:\n%s\n", output)
+		}
+	}
 	return strings.TrimSpace(b.String())
 }
 
@@ -441,16 +575,18 @@ func formatObservation(cmd string, result *exec.Result) string {
 }
 
 func (a *Agent) buildSystemPrompt(session *store.Session) string {
-	sys := systemPrompt
+	sys := buildSystemPromptBase()
+	if session != nil && session.CompactionSummary != "" {
+		sys += "\n\n<conversation_summary>\n" + session.CompactionSummary + "\n</conversation_summary>"
+	}
 	if cfg, err := a.loadConfig(); err == nil && cfg != nil {
 		sys += "\n\n" + sshresolve.FormatHostCatalog(cfg.SSH.Hosts)
 	}
 	if a.Sessions != nil && session != nil && session.ID != "" {
 		workspace := a.Sessions.WorkspaceDir(session.ID)
-		sys += fmt.Sprintf(`
-
-Current session workspace directory: %s
-Session ID: %s`, workspace, session.ID)
+		sys += fmt.Sprintf("\n\nCurrent date: %s", formatPromptDate())
+		sys += fmt.Sprintf("\nCurrent session workspace directory: %s", workspace)
+		sys += fmt.Sprintf("\nSession ID: %s", session.ID)
 	}
 	if a.Skills != nil {
 		if ctx := a.Skills.SystemPromptContext(); ctx != "" {
@@ -476,7 +612,7 @@ func newApprovalID() string {
 func (a *Agent) HandleProposedCommand(ctx context.Context, session *store.Session, cmd string, provider llm.MergedProvider) error {
 	_ = provider
 	return a.HandleProposedTool(ctx, session, ToolCall{
-		Kind:           ToolShell,
+		Kind:           ToolBash,
 		ShellCommand:   cmd,
 		DisplayCommand: cmd,
 	})

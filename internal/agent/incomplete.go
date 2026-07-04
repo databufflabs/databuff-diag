@@ -5,7 +5,10 @@ import (
 	"unicode"
 )
 
-const incompleteNudgeMessage = "你的上一条回复描述了下一步操作，但没有附带 {\"tool\":\"shell\",...} 或 {\"tool\":\"ssh\",...} JSON 命令块。请立即给出可执行的 tool JSON；若诊断已完成，请给出完整结论，不要用「接下来将…」等过渡语结尾。"
+const incompleteNudgeMessage = "你的上一条回复描述了下一步操作，但没有调用工具。请使用 read/write/edit/bash/ssh 工具继续诊断；若诊断已完成，请给出完整结论，不要用「接下来将…」等过渡语结尾。"
+
+const inlineScriptNudgeMessage = `检测到将完整 shell 脚本作为 bash 命令直接执行，这不会保存为文件。请使用 write 工具创建脚本，或 bash 配合重定向写入会话工作区，例如：
+{"tool":"bash","command":"cat > check.sh << 'EOF'\n#!/bin/bash\n...\nEOF\nchmod +x check.sh"}`
 
 const emptyResponseNudgeMessage = "上一条回复为空。请根据对话上下文继续诊断：给出 tool JSON 执行下一步命令，或输出完整结论。"
 
@@ -34,10 +37,10 @@ func looksIncompleteAssistant(text string) bool {
 	tailLower := strings.ToLower(tail)
 
 	phrases := []string{
-		"接下来", "现在先", "让我确认", "让我查看", "让我检查", "我将",
-		"需要先", "准备查看", "准备检查", "将执行", "来查看",
+		"接下来", "现在先", "现在我来", "我来将", "我将", "让我确认", "让我查看", "让我检查",
+		"需要先", "准备查看", "准备检查", "将执行", "来查看", "写入工作目录", "将脚本写入",
 		"进一步检查", "正在检查", "正在查看", "正在获取", "让我先总结",
-		"next step", "let me check", "let me run", "i will run", "i'll run",
+		"next step", "let me check", "let me run", "i will run", "i'll run", "i will write",
 	}
 	for _, p := range phrases {
 		if strings.Contains(tail, p) || strings.Contains(tailLower, p) {
@@ -78,10 +81,11 @@ func looksLikeFinalReport(text string) bool {
 		return false
 	}
 	lower := strings.ToLower(text)
-	if strings.Contains(text, "## ") && (strings.Contains(text, "结论") || strings.Contains(text, "诊断") || strings.Contains(lower, "summary")) {
+	if strings.Contains(text, "## ") && (strings.Contains(text, "结论") || strings.Contains(text, "诊断") ||
+		strings.Contains(text, "总结") || strings.Contains(text, "调研") || strings.Contains(lower, "summary")) {
 		return true
 	}
-	return strings.HasPrefix(text, "## ")
+	return strings.HasPrefix(text, "## ") || strings.HasPrefix(strings.TrimSpace(text), "---\n\n## ")
 }
 
 func looksMalformedToolJSON(text string) bool {

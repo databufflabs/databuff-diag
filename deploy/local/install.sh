@@ -11,6 +11,8 @@
 #
 # Optional verify after start:
 #   VERIFY_ROUNDS=3 ./install.sh
+#   PI_VERIFY_ROUNDS=3 ./install.sh   # pi 项目调研对话验证
+#   INTEGRATION_VERIFY=1 ./install.sh
 
 set -euo pipefail
 
@@ -31,4 +33,15 @@ echo "[install] starting fresh build"
 if [ "${VERIFY_ROUNDS:-0}" -gt 0 ] 2>/dev/null; then
   echo "[install] chat stress verify (${VERIFY_ROUNDS} rounds)"
   "${ROOT}/scripts/chat-stress.sh" "$VERIFY_ROUNDS"
+fi
+
+if [ "${PI_VERIFY_ROUNDS:-0}" -gt 0 ] 2>/dev/null; then
+  echo "[install] pi research verify (${PI_VERIFY_ROUNDS} rounds)"
+  "${ROOT}/scripts/pi-research-verify.sh" "$PI_VERIFY_ROUNDS"
+fi
+
+if [ "${INTEGRATION_VERIFY:-0}" = "1" ]; then
+  echo "[install] integration verify (docker local/remote + file rw)"
+  chmod +x "${ROOT}/scripts/integration-verify.sh"
+  SET_POLICY="${SET_POLICY:-open}" "${ROOT}/scripts/integration-verify.sh"
 fi

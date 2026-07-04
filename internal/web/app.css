@@ -926,6 +926,12 @@ body {
   background: rgba(15, 23, 42, 0.02);
 }
 
+.chat-msg-text.md-content .md-hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 12px 0;
+}
+
 .chat-msg-text.md-content .md-spacer {
   height: 0.35em;
 }
@@ -1131,6 +1137,45 @@ body {
   background: #f8fafc;
 }
 
+.tool-section-collapsible.is-collapsed .tool-output {
+  max-height: calc(1.55em * 20 + 20px);
+  overflow: hidden;
+  position: relative;
+}
+
+.tool-section-collapsible.is-collapsed .tool-output.tool-stdout::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, #f8fafc);
+  pointer-events: none;
+}
+
+.tool-output-toggle {
+  appearance: none;
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tool-output-toggle:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
 .tool-stderr {
   background: #fff1f2;
   color: #9f1239;
@@ -1251,6 +1296,29 @@ body {
 
 .chat-msg-user .chat-proposal-risk {
   color: rgba(255, 255, 255, 0.75);
+}
+
+.chat-tool-calls-summary {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-elevated, rgba(0, 0, 0, 0.02));
+}
+
+.chat-tool-calls-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.chat-tool-calls-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary, inherit);
+  word-break: break-all;
 }
 
 .chat-approvals {

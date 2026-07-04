@@ -56,6 +56,8 @@ cd databuff-diag
 
 ```
 ✓ databuff-diag 启动成功，访问 http://127.0.0.1:8787
+  用户名: Admin
+  密码:   Databuff@123
   日志: /Users/你/.databuff-diag/databuff-diag.log
   PID:  12345
 ```

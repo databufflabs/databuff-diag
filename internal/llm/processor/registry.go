@@ -14,6 +14,12 @@ type Processor interface {
 	Extract(body []byte) (content string, err error)
 }
 
+// CompletionProcessor extracts assistant text and optional tool calls.
+type CompletionProcessor interface {
+	Processor
+	ExtractCompletion(body []byte) (Completion, error)
+}
+
 // Meta describes a registered processor for listing.
 type Meta struct {
 	ID          string

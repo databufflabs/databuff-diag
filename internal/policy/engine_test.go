@@ -40,6 +40,14 @@ func TestEngine_Classify(t *testing.T) {
 		{name: "journalctl", cmd: "journalctl -u nginx --no-pager", want: RiskReadonly},
 		{name: "df", cmd: "df -h", want: RiskReadonly},
 		{name: "free", cmd: "free -m", want: RiskReadonly},
+		{name: "cd", cmd: "cd /tmp && pwd", want: RiskReadonly},
+		{name: "git log", cmd: "git log --oneline -10", want: RiskReadonly},
+		{name: "git remote", cmd: "git remote -v", want: RiskReadonly},
+		{name: "cd git log chain", cmd: "cd /tmp/repo && git log --oneline -5", want: RiskReadonly},
+		{name: "test file exists", cmd: `[ -f "/tmp/README.md" ]`, want: RiskReadonly},
+		{name: "cd if head chain", cmd: `cd /tmp/repo && if [ -f "README.md" ]; then head -100 README.md; fi`, want: RiskReadonly},
+		{name: "find exec echo", cmd: `find /tmp/packages -name "CHANGELOG.md" -exec echo "{}" \;`, want: RiskWrite},
+		{name: "find pipe grep", cmd: `find /tmp/packages -name "*.ts" -path "*/src/*" | grep foo`, want: RiskReadonly},
 
 		// write
 		{name: "systemctl restart", cmd: "systemctl restart nginx", want: RiskWrite},

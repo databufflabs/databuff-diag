@@ -129,3 +129,53 @@ func TestProposalText_NoIntroUsesShortLead(t *testing.T) {
 		t.Fatalf("ProposalText = %q, want 将执行命令", got)
 	}
 }
+
+func TestParseCommand_InlineScriptRejected(t *testing.T) {
+	text := `{"tool":"shell","command":"#!/bin/bash\necho hello\n"}`
+	if _, ok := ParseCommand(text); ok {
+		t.Fatal("expected inline shebang script to be rejected")
+	}
+	if !LooksInlineScriptTool(text) {
+		t.Fatal("expected LooksInlineScriptTool true")
+	}
+}
+
+func TestParseCommand_HeredocWriteAccepted(t *testing.T) {
+	text := `{"tool":"shell","command":"cat > /tmp/x.sh << 'EOF'\n#!/bin/bash\necho hi\nEOF"}`
+	cmd, ok := ParseCommand(text)
+	if !ok {
+		t.Fatal("expected heredoc write command")
+	}
+	if !strings.Contains(cmd, "cat >") {
+		t.Fatalf("command = %q", cmd)
+	}
+}
+
+func TestParseCommand_DirectoryTreeRejected(t *testing.T) {
+	text := "## 总结\n\n### 目录结构要点\n\n```\npi/\n├── packages/\n│   ├── ai/\n└── SECURITY.md\n```"
+	if _, ok := ParseCommand(text); ok {
+		t.Fatal("expected directory tree in bare fence to be rejected")
+	}
+}
+
+func TestParseCommand_BareFenceRejected(t *testing.T) {
+	text := "示例：\n```\nhello world\n```"
+	if _, ok := ParseCommand(text); ok {
+		t.Fatal("expected bare fenced block to be rejected")
+	}
+}
+
+func TestToolCallsFromCompletion_SummaryNotExecuted(t *testing.T) {
+	summary := "## 项目调研总结\n\n```\npi/\n├── packages/\n└── README.md\n```\n\n以上是我的总结。"
+	if calls, ok := ToolCallsFromCompletion(summary, nil); ok {
+		t.Fatalf("expected no tool calls from summary, got %+v", calls)
+	}
+}
+
+func TestToolCallsFromCompletion_BashFenceStillWorks(t *testing.T) {
+	text := "Run:\n```bash\necho hello\n```"
+	calls, ok := ToolCallsFromCompletion(text, nil)
+	if !ok || len(calls) != 1 || calls[0].ShellCommand != "echo hello" {
+		t.Fatalf("calls = %+v, ok=%v", calls, ok)
+	}
+}
