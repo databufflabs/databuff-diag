@@ -1,102 +1,120 @@
 # databuff-diag
 
-[![Release](https://img.shields.io/github/v/release/databufflabs/databuff-diag?label=release)](https://github.com/databufflabs/databuff-diag/releases)
-
-**DataBuff 客户环境排查助手** — 在客户内网运行的轻量诊断 Agent。通过 Web 对话完成部署与环境排障，支持本机与 SSH 远程命令执行，无需云端中控。
+用浏览器对话，帮你排查服务器 / 容器环境问题。
 
 ---
 
-## 功能
+## 开始之前
 
-| 能力 | 说明 |
+准备这三样：
+
+| 需要 | 说明 |
 |------|------|
-| **对话排障** | Web UI 多轮对话，Agent 自动规划、执行命令并汇总结论 |
-| **三档审批** | 全部审批 / 写入审批（默认）/ 全部开放，按命令风险分级闸门 |
-| **LLM Processor** | 可插拔 Response Processor：`openai_compat`、`anthropic_messages`、`databuff_ultra_result` 等 |
-| **Skill** | `SKILL.md` + runbook 插件，内置 `generic-infra`、`databuff-oss` |
-| **SSH** | 多主机远程排障，ControlMaster 连接复用 |
-| **报告** | 会话导出 Markdown 排障报告，环境采集包下载 |
+| Mac 或 Linux 电脑 | 暂不支持 Windows |
+| 能上网 | 下载程序 + 调用大模型 |
+| 大模型 API Key | 推荐 [DeepSeek](https://platform.deepseek.com) 注册后创建，免费额度够用 |
 
 ---
 
-## 安装
+## 第一步：下载并启动
 
-从 [GitHub Releases](https://github.com/databufflabs/databuff-diag/releases) 下载对应平台的预编译包（linux / darwin，amd64 / arm64），解压后安装到 `PATH`：
+**① 下载**
+
+打开 [Releases 下载页](https://github.com/databufflabs/databuff-diag/releases)，根据你的电脑选文件：
+
+| 你的电脑 | 下载这个 |
+|----------|----------|
+| Mac（M1/M2/M3 芯片） | `darwin_arm64` |
+| Mac（Intel 芯片） | `darwin_amd64` |
+| Linux 服务器 | `linux_amd64` 或 `linux_arm64` |
+
+**② 解压**
+
+下载得到一个 `.tar.gz` 文件。打开「终端」（Mac 在「启动台 → 其他 → 终端」），执行：
 
 ```bash
-# 示例：Linux amd64，v0.1.0
-curl -fsSL -O https://github.com/databufflabs/databuff-diag/releases/download/v0.1.0/databuff-diag_0.1.0_linux_amd64.tar.gz
-tar -xzf databuff-diag_0.1.0_linux_amd64.tar.gz
-install -m 755 databuff-diag /usr/local/bin/databuff-diag
-# 无写权限时：mv databuff-diag ~/.local/bin/ && export PATH="$HOME/.local/bin:$PATH"
-
-databuff-diag version
+cd ~/Downloads
+tar -xzf databuff-diag_*.tar.gz
 ```
 
-资产命名：`databuff-diag_{版本号}_{os}_{arch}.tar.gz`（版本号不含 `v` 前缀）。更多平台与内网部署说明见 [安装与启动](docs/quickstart/install.md)。
-
----
-
-## 快速开始
+**③ 启动**
 
 ```bash
-# 启动 HTTP 服务（默认监听 :8787）
-databuff-diag serve
-
-# 浏览器打开
-open http://127.0.0.1:8787    # macOS
-# 或访问 http://127.0.0.1:8787
+./databuff-diag serve
 ```
 
-首次启动会在 **`~/.databuff-diag/`** 创建本地配置与会话目录：
-
-```
-~/.databuff-diag/
-├── config.yaml    # LLM、SSH、策略、Skill 路径
-├── skills/        # 用户安装的 Skill 包
-├── sessions/      # 对话会话
-└── reports/       # 导出报告
-```
-
-查看配置目录路径：`databuff-diag config path`
-
-健康检查：`curl http://127.0.0.1:8787/health`
+看到 `databuff-diag listening on :8787` 表示启动成功。**不要关闭这个终端窗口**，关了程序就停了。
 
 ---
 
-## 文档
+## 第二步：登录
 
-| 文档 | 说明 |
-|------|------|
-| [安装与启动](docs/quickstart/install.md) | Release 下载、本地开发模式 |
-| [配置大模型](docs/quickstart/configure-llm.md) | Provider、API Key、Response Processor、测试连接 |
-| [配置远程主机 SSH](docs/quickstart/configure-ssh-hosts.md) | 添加主机、凭证、对话中远程排障 |
-| [开发计划](docs/development-plan.md) | 里程碑与架构（开发者向） |
-| [本地开发](deploy/README.md) | 源码编译、`deploy/local/` 启停脚本 |
+浏览器打开：**http://127.0.0.1:8787**
 
----
+| 用户名 | 密码 |
+|--------|------|
+| Admin | Databuff@123 |
 
-## 版本状态
+点 **登录**。
 
-**v0.1** — 首个可交付版本：Web 对话排障、LLM 配置、三档命令审批、Skill 加载、SSH 远程执行与报告导出均已可用。详见 [Releases](https://github.com/databufflabs/databuff-diag/releases)。
+![登录页](docs/images/login.png)
 
 ---
 
-## 仓库结构
+## 第三步：配置大模型
+
+大模型相当于「大脑」，不配好无法对话。
+
+1. 点左下角 **设置**
+2. 确认在 **大模型** 这一页
+3. 点击 **DeepSeek** 卡片（或你用的其他模型）
+4. 在 **API Key** 框粘贴你的密钥（从 [platform.deepseek.com](https://platform.deepseek.com) → API Keys 创建）
+5. 点 **测试连接**，显示成功
+6. 点 **保存并启用**
+
+![填写 API Key](docs/images/llm-config.png)
+
+---
+
+## 第四步：添加远程机器（可选）
+
+如果要排查**别的服务器**，需要先把 SSH 登录信息存进来。只查本机可跳过。
+
+1. **设置** → **远程主机** → **添加主机**
+2. 填写服务器 IP、用户名、密码
+3. 保存
+
+![添加远程主机](docs/images/settings-ssh.png)
+
+---
+
+## 第五步：开始排障
+
+点左上角 **返回对话**（或 **新对话**）。
+
+在底部输入框用**普通话**描述你想查什么，点 **发送**：
 
 ```
-databuff-diag/
-├── cmd/              # CLI 入口（serve / version / config）
-├── internal/         # server、agent、llm、policy、skill、web UI
-├── deploy/           # 本地开发脚本、内置 Skill、打包
-├── docs/             # 用户文档与开发计划
-└── Makefile
+帮我看看 192.168.50.140 这台机器 Docker 容器是否正常
 ```
 
-内部开发产物在 `.dev/`（任务验收记录等），不参与日常使用。
+也可以直接点页面上的快捷按钮（如「检查 Docker 容器健康状态」）。
+
+![对话界面](docs/images/chat.png)
+
+AI 会自动执行命令并把结果告诉你。如果弹出「待批准」提示，点 **批准** 即可。
 
 ---
 
-## 开源
+## 常见问题
 
-本项目由 [DataBuff](https://github.com/databufflabs) 维护，欢迎 Issue 与 PR。
+| 问题 | 怎么办 |
+|------|--------|
+| 网页打不开 | 确认终端里 `databuff-diag serve` 还在运行 |
+| 登录不了 | 检查用户名 `Admin`、密码 `Databuff@123` |
+| 对话没反应 | 回到 **设置 → 大模型**，确认已「保存并启用」且测试连接成功 |
+| 连不上远程机器 | 检查 IP、用户名、密码是否正确；密码登录需先执行 `brew install sshpass`（Mac） |
+
+---
+
+有问题欢迎提 [Issue](https://github.com/databufflabs/databuff-diag/issues)。
