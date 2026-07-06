@@ -1334,6 +1334,7 @@
       apiKey: document.getElementById("field-api-key"),
       apiKeyHint: document.getElementById("field-api-key-hint"),
       baseUrl: document.getElementById("field-base-url"),
+      baseUrlHint: document.getElementById("field-base-url-hint"),
       model: document.getElementById("field-model"),
       processor: document.getElementById("field-response-processor"),
       testBtn: document.getElementById("btn-test"),
@@ -1503,6 +1504,22 @@
       return !!inst.api_key;
     }
 
+    function updateBaseUrlHint() {
+      if (!els.baseUrlHint || !els.processor) {
+        return;
+      }
+      if (els.processor.value === "databuff_ultra_result") {
+        els.baseUrlHint.textContent =
+          "与 DataBuff Ultra 一致：填写完整 API 地址（如 https://host/apis/ais/qwen2-72b），不要追加 /chat/completions";
+        els.baseUrl.placeholder = "https://host/apis/ais/qwen2-72b";
+        show(els.baseUrlHint, true);
+      } else {
+        els.baseUrlHint.textContent = "";
+        els.baseUrl.placeholder = "https://api.example.com/v1";
+        show(els.baseUrlHint, false);
+      }
+    }
+
     function updateApiKeyHint(code) {
       if (!els.apiKeyHint) {
         return;
@@ -1538,6 +1555,7 @@
       els.baseUrl.value = draft.base_url;
       els.model.value = draft.model;
       els.processor.value = draft.response_processor || "openai_compat";
+      updateBaseUrlHint();
       updateApiKeyHint(code);
     }
 
@@ -2214,6 +2232,9 @@
           updateApiKeyHint(selectedCode);
         }
       });
+    }
+    if (els.processor) {
+      els.processor.addEventListener("change", updateBaseUrlHint);
     }
     if (els.testBtn) {
       els.testBtn.addEventListener("click", onTest);

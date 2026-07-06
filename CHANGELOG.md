@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-06
+
+### Fixed
+
+- 修复 DataBuff Ultra 网关测试连接失败：`databuff_ultra_result` 解析器下 Base URL 与 Ultra `OpenAIService` 一致，原样 POST，不再错误追加 `/chat/completions`
+- 设置页选择 Ultra 解析器时提示填写完整 API 地址（如 `/apis/ais/qwen2-72b`）
+
 ## [0.1.0] - 2026-07-05
 
 首个正式版本。

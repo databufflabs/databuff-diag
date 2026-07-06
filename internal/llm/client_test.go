@@ -38,6 +38,9 @@ func TestClient_Chat_OpenAICompat(t *testing.T) {
 
 func TestClient_Chat_DatabuffUltraResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/apis/ais/qwen-72b" {
+			t.Fatalf("path = %q, want /apis/ais/qwen-72b", r.URL.Path)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"result":"ultra-ok"}`))
 	}))
@@ -46,7 +49,7 @@ func TestClient_Chat_DatabuffUltraResult(t *testing.T) {
 	client := NewClient()
 	provider := MergedProvider{
 		ProviderCode:      "boc-gateway",
-		BaseURL:           srv.URL + "/v1",
+		BaseURL:           srv.URL + "/apis/ais/qwen-72b",
 		Model:             "qwen-72b",
 		WireAPI:           "openai_compat",
 		ResponseProcessor: "databuff_ultra_result",
@@ -65,6 +68,9 @@ func TestClient_Chat_DatabuffUltraResult(t *testing.T) {
 
 func TestClient_Chat_DatabuffUltraResult_Escaped(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/apis/ais/qwen-72b" {
+			t.Fatalf("path = %q, want /apis/ais/qwen-72b", r.URL.Path)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{\"result\":\"escaped-ok\"}`))
 	}))
@@ -73,7 +79,7 @@ func TestClient_Chat_DatabuffUltraResult_Escaped(t *testing.T) {
 	client := NewClient()
 	provider := MergedProvider{
 		ProviderCode:      "boc-gateway",
-		BaseURL:           srv.URL + "/v1",
+		BaseURL:           srv.URL + "/apis/ais/qwen-72b",
 		Model:             "qwen-72b",
 		ResponseProcessor: "databuff_ultra_result",
 	}

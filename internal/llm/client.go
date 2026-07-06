@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/databufflabs/databuff-diag/internal/llm/processor"
@@ -81,10 +80,7 @@ func (c *Client) Chat(ctx context.Context, provider MergedProvider, req ChatRequ
 		return nil, fmt.Errorf("marshal chat request: %w", err)
 	}
 
-	url := strings.TrimRight(provider.BaseURL, "/")
-	if !strings.HasSuffix(url, "/chat/completions") {
-		url += "/chat/completions"
-	}
+	url := chatEndpointURL(provider)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {

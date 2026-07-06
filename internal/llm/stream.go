@@ -51,10 +51,7 @@ func (c *Client) ChatStreamCollect(ctx context.Context, provider MergedProvider,
 		return StreamResult{}, fmt.Errorf("marshal chat request: %w", err)
 	}
 
-	url := strings.TrimRight(provider.BaseURL, "/")
-	if !strings.HasSuffix(url, "/chat/completions") {
-		url += "/chat/completions"
-	}
+	url := chatEndpointURL(provider)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
