@@ -1337,6 +1337,7 @@
       baseUrlHint: document.getElementById("field-base-url-hint"),
       model: document.getElementById("field-model"),
       processor: document.getElementById("field-response-processor"),
+      toolsEnabled: document.getElementById("field-tools-enabled"),
       testBtn: document.getElementById("btn-test"),
       saveBtn: document.getElementById("btn-save"),
       testResult: document.getElementById("test-result"),
@@ -1485,6 +1486,7 @@
         base_url: inst.base_url || (catalog ? catalog.default_base_url : "") || "",
         model: inst.model || (catalog ? catalog.default_model : "") || "",
         response_processor: processor || "openai_compat",
+        tools_enabled: inst.tools_enabled !== false,
       };
     }
 
@@ -1546,6 +1548,7 @@
         base_url: els.baseUrl.value.trim(),
         model: els.model.value.trim(),
         response_processor: els.processor.value,
+        tools_enabled: els.toolsEnabled ? els.toolsEnabled.checked : true,
       };
     }
 
@@ -1555,6 +1558,9 @@
       els.baseUrl.value = draft.base_url;
       els.model.value = draft.model;
       els.processor.value = draft.response_processor || "openai_compat";
+      if (els.toolsEnabled) {
+        els.toolsEnabled.checked = draft.tools_enabled !== false;
+      }
       updateBaseUrlHint();
       updateApiKeyHint(code);
     }
@@ -2107,6 +2113,9 @@
         }
         if (prev.timeout_sec) {
           entry.timeout_sec = prev.timeout_sec;
+        }
+        if (draft.tools_enabled === false) {
+          entry.tools_enabled = false;
         }
         out.llm.providers[code] = entry;
       });

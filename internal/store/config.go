@@ -77,6 +77,7 @@ type ProviderInstance struct {
 	TimeoutSec        int    `yaml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	ResponseProcessor string `yaml:"response_processor,omitempty" json:"response_processor,omitempty"`
 	SupportsVision    *bool  `yaml:"supports_vision,omitempty" json:"supports_vision,omitempty"`
+	ToolsEnabled      *bool  `yaml:"tools_enabled,omitempty" json:"tools_enabled,omitempty"`
 }
 
 // PolicyConfig holds command approval defaults.

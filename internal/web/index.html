@@ -317,6 +317,13 @@
               <option value="databuff_ultra_result">databuff_ultra_result — DataBuff Ultra</option>
             </select>
           </div>
+          <div class="form-row">
+            <label class="form-checkbox" for="field-tools-enabled">
+              <input type="checkbox" id="field-tools-enabled" name="tools_enabled" checked>
+              <span>启用 Tools（Function Calling）</span>
+            </label>
+            <p class="form-hint">关闭后 LLM 请求不携带 tools 字段（默认开启）</p>
+          </div>
           <div id="test-result" class="test-result" role="status" hidden></div>
           <div id="save-status" class="save-status" role="status" hidden></div>
         </form>

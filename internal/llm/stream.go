@@ -46,6 +46,8 @@ func (c *Client) ChatStreamCollect(ctx context.Context, provider MergedProvider,
 	}
 	req.Stream = true
 
+	ApplyProviderChatOptions(provider, &req)
+
 	payload, err := json.Marshal(req)
 	if err != nil {
 		return StreamResult{}, fmt.Errorf("marshal chat request: %w", err)

@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -39,6 +40,23 @@ func TestDatabuffUltraResult_EmptyBody(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty body")
 	}
+}
+
+func TestDatabuffUltraResult_ToolCallsInResultJSON(t *testing.T) {
+	inner := `{"choices":[{"message":{"tool_calls":[{"id":"call-1","type":"function","function":{"name":"bash","arguments":"{\"command\":\"docker ps\"}"}}]}}]}`
+	body := []byte(`{"result":` + jsonString(inner) + `}`)
+	c, err := (&DatabuffUltraResult{}).ExtractCompletion(body)
+	if err != nil {
+		t.Fatalf("ExtractCompletion: %v", err)
+	}
+	if len(c.ToolCalls) != 1 || c.ToolCalls[0].Name != "bash" {
+		t.Fatalf("tool_calls = %#v", c.ToolCalls)
+	}
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 func TestOpenAICompat_Extract(t *testing.T) {

@@ -42,6 +42,7 @@ type MergedProvider struct {
 	TimeoutSec        int
 	ResponseProcessor string
 	SupportsVision    *bool
+	ToolsEnabled      *bool
 	FromCatalog       bool
 }
 
@@ -76,6 +77,7 @@ func MergeProviders(catalog []CatalogEntry, cfg *store.Config) []MergedProvider 
 				TimeoutSec:        inst.TimeoutSec,
 				ResponseProcessor: inst.ResponseProcessor,
 				SupportsVision:    inst.SupportsVision,
+				ToolsEnabled:      inst.ToolsEnabled,
 				FromCatalog:       false,
 			})
 		}
@@ -116,6 +118,7 @@ func mergeOne(entry CatalogEntry, cfg *store.Config) MergedProvider {
 	out.TimeoutSec = inst.TimeoutSec
 	out.ResponseProcessor = inst.ResponseProcessor
 	out.SupportsVision = inst.SupportsVision
+	out.ToolsEnabled = inst.ToolsEnabled
 	return out
 }
 

@@ -7,7 +7,14 @@
 ### Fixed
 
 - 修复 DataBuff Ultra 网关测试连接失败：`databuff_ultra_result` 解析器下 Base URL 与 Ultra `OpenAIService` 一致，原样 POST，不再错误追加 `/chat/completions`
+- 修复 DataBuff Ultra 对话失败：适配 messages（合并 system、末尾补 user、tool 结果转 user），与网关 `last message must be user` 要求一致
+- Ultra 网关请求强制 `stream: false`，与 Ultra `OpenAIService` 一致
+- Ultra 响应 `result` 字段内嵌 OpenAI JSON 时正确解析 `tool_calls`
 - 设置页选择 Ultra 解析器时提示填写完整 API 地址（如 `/apis/ais/qwen2-72b`）
+
+### Added
+
+- 模型配置新增「启用 Tools」开关（`tools_enabled`，默认开启）；关闭后 LLM 请求不携带 `tools` / `tool_choice`
 
 ## [0.1.0] - 2026-07-05
 
@@ -60,4 +67,5 @@
 | Linux ARM64 | `databuff-diag_0.1.0_linux_arm64.tar.gz` |
 | Windows x86_64 | `databuff-diag_0.1.0_windows_amd64.zip` |
 
+[0.1.1]: https://github.com/databufflabs/databuff-diag/releases/tag/v0.1.1
 [0.1.0]: https://github.com/databufflabs/databuff-diag/releases/tag/v0.1.0
